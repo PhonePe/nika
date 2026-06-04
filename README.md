@@ -44,10 +44,39 @@ At a high level, Nika follows this analysis flow:
 2. Identify configured sources where attacker-controlled input enters the application.
 3. Identify sinks that represent security-sensitive operations.
 4. Perform cross-file and inter-procedural analysis to determine whether input can reach those sinks.
-5. Optionally review traces to reduce false positives.
+5. Optionally review vulnerability with AI Agent to reduce false positives.
 6. Produce an HTML report with the vulnerable path, affected code locations, and remediation context.
 
 ## Quick Start
+
+## Configuration
+
+Sample configuration is available at `config/crtConfig.yml`
+
+In most cases, you only need to change a few values to get started.
+The notes below explain what each option does, so it is easier to tailor the scan to your setup.
+
+1. `LLMConfig`: Top-level settings for the optional LLM-backed exploitability review.
+2. `LLMConfig.API_KEY`: API key used to authenticate with the configured LLM provider or gateway.
+3. `LLMConfig.LLM_URL`: Base URL for the LLM endpoint.
+4. `LLMConfig.MODEL`: Model identifier used when the review agent is enabled.
+5. `LLMConfig.MAX_TOOL_CALLS`: Maximum number of tool invocations the review agent can make in a single run.
+6. `LLMConfig.MAX_ITERATIONS`: Maximum number of review iterations the agent can perform before stopping.
+7. `LLMConfig.RECURSION_LIMIT`: Safety limit for nested agent execution depth.
+8. `LLMConfig.PROMPT_COST_PER_MILLION`: Cost metadata for prompt tokens, used when tracking review usage.
+9. `LLMConfig.COMPLETION_COST_PER_MILLION`: Cost metadata for completion tokens, used alongside prompt pricing.
+10. `llm_review_enabled`: Enables or disables the LLM-assisted exploitability review stage.
+11. `aggressiveScan`: Turns on a more aggressive reachability analysis mode that can uncover deeper paths at the cost of more false positives.
+12. `sources.annotations`: List of framework annotations that should be treated as taint-entry points.
+13. `max_threads`: Number of worker threads available for scan execution.
+14. `vulnerabilityConfig`: List of vulnerability categories to include in the current scan.
+15. `vulnerabilityArgs`: Per-vulnerability overrides or detector arguments, such as keyword lists for `sensitive_logging`.
+16. `tools`: Tool-specific configuration used by analysis engines.
+17. `tools.astrail.astrailpath`: Path to the Astrail binary.
+18. `tools.astrail.javasrc2cpg`: Path to the `javasrc2cpg` binary used to build the code property graph.
+19. `tools.astrail.port`: Port used by the Astrail service.
+20. `tools.opengrep.path`: Path to the OpenGrep binary.
+
 
 ### Run via Docker
 
@@ -93,4 +122,4 @@ Use `aggressiveScan` when the codebase is harder to follow because data flows th
 
 ## Language Support
 
-Nika currently supports Java. Java is the only fully supported language today; support for other languages remains planned.
+Java is the only fully supported language today; support for other languages remains planned.
