@@ -30,7 +30,8 @@ jobs:
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
       image_repository: ${{ steps.version.outputs.image_repository }}
-      release_ref: ${{ steps.publish_release.outputs.release_ref }}
+      release_ref: ${{ steps.prepare_release_ref.outputs.release_ref }}
+      release_commit_sha: ${{ steps.prepare_release_ref.outputs.release_commit_sha }}
 
     steps:
       - name: Checkout repository
@@ -42,7 +43,7 @@ jobs:
         id: version
         env:
           RELEASE_TYPE: ${{ inputs.releaseType }}
-        shell: bash -e
+        shell: bash
         run: |
           set -euo pipefail
 
@@ -83,7 +84,7 @@ jobs:
       - name: Update runtime version
         env:
           NEW_VERSION: ${{ steps.version.outputs.new_version }}
-        shell: bash -e
+        shell: bash
         run: |
           set -euo pipefail
 
@@ -92,10 +93,10 @@ jobs:
           EOF
 
       - name: Commit version update and push release ref
-        id: publish_release
+        id: prepare_release_ref
         env:
           NEW_VERSION: ${{ steps.version.outputs.new_version }}
-        shell: bash -e
+        shell: bash
         run: |
           set -euo pipefail
 
@@ -104,12 +105,14 @@ jobs:
 
           git add runtime/version.py
           git commit -m "chore: release ${NEW_VERSION}"
-          git push origin HEAD:main
 
-          git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
-          git push origin "$NEW_VERSION"
+          release_ref="release/${NEW_VERSION}"
+          release_commit_sha="$(git rev-parse HEAD)"
 
-          echo "release_ref=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          git push origin "HEAD:${release_ref}"
+
+          echo "release_ref=${release_ref}" >> "$GITHUB_OUTPUT"
+          echo "release_commit_sha=${release_commit_sha}" >> "$GITHUB_OUTPUT"
 
   build-and-push-image:
     needs: prepare-release
@@ -156,7 +159,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=nika
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.revision=${{ needs.prepare-release.outputs.release_commit_sha }}
             org.opencontainers.image.version=${{ needs.prepare-release.outputs.new_version }}
 
   publish-manifest:
@@ -196,6 +199,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout release ref
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ needs.prepare-release.outputs.release_ref }}
+          fetch-depth: 0
+
+      - name: Push release commit to main and tag it
+        env:
+          NEW_VERSION: ${{ needs.prepare-release.outputs.new_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git push origin HEAD:main
+
+          git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
+          git push origin "$NEW_VERSION"
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda
         with:
@@ -203,3 +227,13 @@ jobs:
           name: ${{ needs.prepare-release.outputs.new_version }}
           generate_release_notes: true
           make_latest: true
+
+      - name: Delete temporary release branch
+        if: ${{ success() }}
+        env:
+          RELEASE_REF: ${{ needs.prepare-release.outputs.release_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git push origin --delete "$RELEASE_REF"
