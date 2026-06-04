@@ -5,9 +5,7 @@ from languages.java.pack import JavaLanguagePack
 from vulnerabilities.code_injection import CodeInjectionVulnerability
 from vulnerabilities.command_injection import CommandInjectionVulnerability
 from vulnerabilities.deserialization import DeserializationVulnerability
-from vulnerabilities.external_api_calls import ExternalApiCallsVulnerability
 from vulnerabilities.insecure_crypto import InsecureCryptoVulnerability
-from vulnerabilities.olympus_rules.vulnerability import OlympusRulesVulnerability
 from vulnerabilities.order_scan import OrderScanVulnerability
 from vulnerabilities.path_traversal import PathTraversalVulnerability
 from vulnerabilities.sensitive_logging.vulnerability import SensitiveLoggingVulnerability
@@ -64,7 +62,6 @@ def build_default_registry():
     registry.register_engine("dataflow_analyzer", "astrail", AstrailEngine, requires_path=True)
     registry.register_engine("order_finder", "order_analyzer", OrderSinkFinder)
     registry.register_vulnerability("sensitive_logging", SensitiveLoggingVulnerability)
-    registry.register_vulnerability("olympus_rules", OlympusRulesVulnerability)
     registry.register_vulnerability("sql_injection", SqlInjectionVulnerability)
     registry.register_vulnerability("ssrf", SsrfVulnerability)
     registry.register_vulnerability("xxe", XxeVulnerability)
@@ -74,7 +71,6 @@ def build_default_registry():
     registry.register_vulnerability("template_injection", TemplateInjectionVulnerability)
     registry.register_vulnerability("deserialization", DeserializationVulnerability)
     registry.register_vulnerability("unsafe_reflection", UnsafeReflectionVulnerability)
-    registry.register_vulnerability("external_api_calls", ExternalApiCallsVulnerability)
     registry.register_vulnerability("cryptographic_failure", InsecureCryptoVulnerability)
     registry.register_vulnerability("order_scan", OrderScanVulnerability)
     return registry
