@@ -45,13 +45,13 @@ Copyright &copy; 2026 PhonePe Private Limited
 #
 # Read more: https://zensical.org/docs/setup/navigation/
 nav = [
-  { "Home" = "introduction.md" },
+  { "Introduction" = "index.md" },
   { "Installation Guide" = "installation-guide.md" },
   { "Run a scan" = "run-a-scan.md" },
   { "Features" = "features.md" },
   { "Custom Rules" = "custom-rules.md" },
-  { "Roadmap" = "roadmap.md" },
-  {"Astrail" = "astrail.md" }
+  {"Astrail" = "astrail.md" },
+  { "Roadmap" = "roadmap.md" }
 ]
 
 # With the "extra_css" option you can add your own CSS styling to customize

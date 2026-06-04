@@ -1,3 +1,6 @@
+---
+title: Introduction
+---
 
 <div align="center">
   <img src="./assets/nika.png" width="900" style="border-radius:20px;">

@@ -1,6 +1,6 @@
 # Astrail
 
-Astrail is a Java-focused fork of [Joern](https://joern.io/).
+We have created Astrail which is a Java-focused fork of [Joern](https://joern.io/).
 
 Nika uses Astrail because many real vulnerabilities are not visible from one file or one method alone. In a typical Java application, untrusted input may move through controllers, services, helpers, and indirect method calls before it reaches a dangerous sink.
 

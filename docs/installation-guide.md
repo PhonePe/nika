@@ -12,86 +12,49 @@
 | Library | coreutils |
 
 
-## Configuration
+## Run via Docker
 
-Nika loads its settings from YAML configuration.
+You can use pre-built docker images.
 
-- Default sample config: `config/crtConfig.yml`
-- local config target when running via provided bash script: `config/native-crtConfig.yml`
+```bash
+docker pull ghcr.io/phonepe/nika:latest
+export NIKA_IMAGE=ghcr.io/phonepe/nika
+./run.sh --path /absolute/path/to/code --config /absolute/path/to/crtConfig.yml --output ./report.html
+```
 
-The configuration controls scan behavior, enabled vulnerabilities, engine tool paths, and the optional exploitability review step.
+or build a docker image yourself.
 
-If you want Nika to run the AI-powered exploitability check, enable LLM review and provide the model settings it needs.
+```bash
+git clone https://github.com/PhonePe/nika.git
+cd nika
+./build.sh
+./run.sh --path /absolute/path/to/code --config /absolute/path/to/crtConfig.yml --output ./report.html
+```
 
-### Configuration Fields
+## Run locally
 
-1. `LLMConfig`: Top-level settings for the optional LLM-backed exploitability review.
-2. `LLMConfig.API_KEY`: API key used to authenticate with the configured LLM provider or gateway.
-3. `LLMConfig.LLM_URL`: Base URL for the LLM endpoint.
-4. `LLMConfig.MODEL`: Model identifier used when the review agent is enabled.
-5. `LLMConfig.MAX_TOOL_CALLS`: Maximum number of tool invocations the review agent can make in a single run.
-6. `LLMConfig.MAX_ITERATIONS`: Maximum number of review iterations the agent can perform before stopping.
-7. `LLMConfig.RECURSION_LIMIT`: Safety limit for nested agent execution depth.
-8. `LLMConfig.PROMPT_COST_PER_MILLION`: Cost metadata for prompt tokens, used when tracking review usage.
-9. `LLMConfig.COMPLETION_COST_PER_MILLION`: Cost metadata for completion tokens, used alongside prompt pricing.
-10. `llm_review_enabled`: Enables or disables the LLM-assisted exploitability review stage.
-11. `aggressiveScan`: Turns on a more aggressive reachability analysis mode that can uncover deeper paths at the cost of more false positives.
-12. `sources.annotations`: List of framework annotations that should be treated as taint-entry points.
-13. `max_threads`: Number of worker threads available for scan execution.
-14. `vulnerabilityConfig`: List of vulnerability categories to include in the current scan.
-15. `vulnerabilityArgs`: Per-vulnerability overrides or detector arguments, such as keyword lists for `sensitive_logging`.
-16. `tools`: Tool-specific configuration used by analysis engines.
-17. `tools.astrail.astrailpath`: Path to the Astrail binary.
-18. `tools.astrail.javasrc2cpg`: Path to the `javasrc2cpg` binary used to build the code property graph.
-19. `tools.astrail.port`: Port used by the Astrail service.
-20. `tools.opengrep.path`: Path to the OpenGrep binary.
+```bash
+git clone https://github.com/PhonePe/nika.git
+cd nika
+./native-build.sh
+./native-run.sh --path /absolute/path/to/code --output ./report.html
+```
 
-### Local Scan
+## Enable AI based False Positive Analysis
 
-Use this when you want a local Python environment, local tool installs, and faster scan results.
+* Docker Setup - You can modify the config at /absolute/path/to/crtConfig.yml.
+* Local Setup - You can modify the config at /absolute/path/to/native-crtConfig.yml.
 
-1. Clone nika repository
+```yaml
+LLMConfig:
+  API_KEY: 'API_TOKEN'
+  LLM_URL: 'https://chatgpt.com/api/v1'
+  MODEL: 'GPT-5'
+  MAX_TOOL_CALLS: 10
+  MAX_ITERATIONS: 15
+  RECURSION_LIMIT: 100
+  PROMPT_COST_PER_MILLION: 1.25
+  COMPLETION_COST_PER_MILLION: 10.0
 
-	```bash
-	git clone https://github.com/PhonePe/nika.git
-	```
-
-2. Prepare the native environment:
-
-	```bash
-	cd nika
-	./native-build.sh
-	```
-
-	`native-build.sh` sets up the virtual environment, installs dependencies, prepares native tools, and writes the native config used by the launcher.
-
-3. Run the scan:
-
-	```bash
-	./native-run.sh --path /absolute/path/to/code --output ./report.html
-	```
-
-### Scan via Docker
-
-Use this when you want an isolated runtime with the scan environment packaged into a Docker image.
-
-1. Clone nika repository
-
-	```bash
-	git clone https://github.com/PhonePe/nika.git
-	```
-
-2. Build the image:
-
-	```bash
-	cd nika
-	./build.sh
-	```
-
-	`build.sh` creates the `nika:latest` image by default.
-
-3. Run the scan:
-
-	```bash
-	./run.sh --path /absolute/path/to/code --config /absolute/path/to/crtConfig.yml --output ./report.html
-	```
+llm_review_enabled: false
+```

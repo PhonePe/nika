@@ -4,7 +4,7 @@ Nika is currently focused on Java and cross-file taint analysis, but there are a
 
 ## Near-Term Priorities
 
-### Business Logic Vulnerability Detection
+### 1. Business Logic Vulnerability Detection
 
 We want to expand Nika beyond traditional source-to-sink issues and add support for **business logic vulnerabilities**.
 
@@ -15,7 +15,7 @@ That includes cases like:
 
 These problems are harder than classic sink-driven vulnerabilities because they depend on how the application behaves, not just on one risky API. Better coverage here is an important part of the roadmap.
 
-### Broader Language Support
+### 2. Broader Language Support
 
 We also want to bring Nika to more languages beyond Java.
 
@@ -26,7 +26,7 @@ The main additions we are planning are:
 
 The goal is not just to parse these languages, but to support useful analysis in them: source discovery, sink modeling, propagation tracking, and practical vulnerability reporting.
 
-## Longer-Term Direction
+### 3. Longer-Term Direction
 
 Over time, we also want Nika to work better in codebases with indirect dispatch, heavy framework usage, and application-specific security rules.
 
