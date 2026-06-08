@@ -33,6 +33,8 @@ def _to_legacy_vulnerability(finding):
             for node in finding.trace.nodes
         ]
 
+    metadata = getattr(finding, "metadata", None) or {}
+
     return Vulnerability(
         sink=finding.sink,
         call_path=" -> ".join(node.code for node in call_graph),
@@ -41,6 +43,8 @@ def _to_legacy_vulnerability(finding):
         line_number=finding.line_number or 0,
         line_number_end=finding.line_number_end or finding.line_number or 0,
         filename=finding.file_path,
+        class_api_path=metadata.get("class_api_path") or None,
+        method_api_path=metadata.get("method_api_path") or None,
     )
 
 

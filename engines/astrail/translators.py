@@ -71,6 +71,7 @@ def translate_batch_reachability(raw: list[dict]) -> list[Trace]:
                 sink_file_path=entry.get("fileName", ""),
                 sink_line_number=int(entry.get("lineNumber") or 0),
                 nodes=nodes,
+                source_symbol=_extract_source_symbol(entry),
             )
         )
 

@@ -53,6 +53,14 @@ class JsonReportWriter:
                     "lineNumberEnd": v.line_number_end,
                 }
 
+                api_path = {}
+                if getattr(v, "class_api_path", None):
+                    api_path["classPath"] = v.class_api_path
+                if getattr(v, "method_api_path", None):
+                    api_path["methodPath"] = v.method_api_path
+                if api_path:
+                    finding_data["apiPath"] = api_path
+
                 if v.analysis:
                     finding_data["explanation"] = v.analysis.explanation
                     finding_data["remediation"] = v.analysis.remediation

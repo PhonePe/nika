@@ -196,7 +196,26 @@ def _finding_from_sink(vulnerability_id, sink, review=None, trace=None, metadata
     )
 
 
-def findings_from_trace_review(vulnerability_id: str, sinks, traces, reviews):
+def _api_path_metadata(trace, source_lookup):
+    if not source_lookup or not getattr(trace, "source_symbol", None):
+        return {}
+
+    source = source_lookup.get(trace.source_symbol)
+    if source is None:
+        return {}
+
+    metadata = getattr(source, "metadata", None) or {}
+    api_path = {}
+    class_api_path = (metadata.get("class_api_path") or "").strip()
+    method_api_path = (metadata.get("method_api_path") or "").strip()
+    if class_api_path:
+        api_path["class_api_path"] = class_api_path
+    if method_api_path:
+        api_path["method_api_path"] = method_api_path
+    return api_path
+
+
+def findings_from_trace_review(vulnerability_id: str, sinks, traces, reviews, source_lookup=None):
     sink_lookup = {}
     normalized_sink_lookup = {}
 
@@ -232,6 +251,7 @@ def findings_from_trace_review(vulnerability_id: str, sinks, traces, reviews):
                 sink,
                 review=review,
                 trace=trace,
+                metadata=_api_path_metadata(trace, source_lookup),
             )
         )
 
@@ -255,11 +275,17 @@ def finalize_trace_findings(vulnerability, context, state):
     reviews = getattr(state, "reviews", None) or [
         vulnerability.llm_reviewer("", "") for _ in state.traces
     ]
+    source_lookup = {
+        source.symbol: source
+        for source in (getattr(state, "sources", None) or [])
+        if getattr(source, "symbol", None)
+    }
     return findings_from_trace_review(
         vulnerability.vulnerability_id,
         state.sinks,
         state.traces,
         reviews,
+        source_lookup=source_lookup,
     )
 
 
