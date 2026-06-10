@@ -88,6 +88,7 @@ class AstrailEngine:
         require_comparison: bool = True,
         match_generic_id: bool = True,
         endpoint_identifiers: dict | None = None,
+        ownership_annotations=None,
     ):
         raw = self._get_query_runner().run_ownership_reachability(
             endpoint_symbols,
@@ -100,6 +101,7 @@ class AstrailEngine:
             require_comparison=require_comparison,
             match_generic_id=match_generic_id,
             endpoint_identifiers=endpoint_identifiers,
+            ownership_annotations=ownership_annotations,
         )
         protected = {}
         for entry in raw or []:

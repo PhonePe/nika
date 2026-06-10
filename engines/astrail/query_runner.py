@@ -398,6 +398,7 @@ def execute_once = {{
         require_comparison: bool = True,
         match_generic_id: bool = True,
         endpoint_identifiers: dict | None = None,
+        ownership_annotations=None,
     ):
         if not endpoint_symbols:
             return []
@@ -429,6 +430,7 @@ def execute_once = {{
                 "requireIdentifierParam": require_identifier_param,
                 "requireComparison": require_comparison,
                 "matchGenericId": match_generic_id,
+                "ownershipAnnotation": ownership_annotations or [],
                 "endpoint": endpoint_lines,
             }
         )

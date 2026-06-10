@@ -27,6 +27,7 @@ def findOwnershipReachable(
   val principalAnnotations = params.getOrElse("principalAnnotation", Nil).toSet
   val identifierNames = params.getOrElse("identifier", Nil).toSet
   val explicitFunctions = params.getOrElse("explicitFunction", Nil).toSet
+  val ownershipAnnotations = params.getOrElse("ownershipAnnotation", Nil).toSet
   val requireIdentifierParam = params.getOrElse("requireIdentifierParam", Nil).headOption.contains("true")
   val requireComparison = params.getOrElse("requireComparison", Nil).headOption.contains("true")
   val matchGenericId = params.getOrElse("matchGenericId", Nil).headOption.contains("true")
@@ -217,6 +218,24 @@ def findOwnershipReachable(
 
   val results = mutable.ArrayBuffer[String]()
   val handled = mutable.Set[String]()
+
+  val annoOwnSeq = ownershipAnnotations.toSeq
+  if (annoOwnSeq.nonEmpty) {
+    for ((ep, _epIds) <- endpointEntries if !handled.contains(ep)) {
+      cpg.method.fullNameExact(ep).headOption.foreach { m =>
+        m.annotation.find { a =>
+          val fn = a.fullName
+          annoOwnSeq.exists(x => a.name == x || (fn != null && (fn == x || fn.endsWith("." + x))))
+        }.foreach { a =>
+          results.append(
+            s"""{"endpoint":"${esc(ep)}","protected":true,"reachedMethod":"@${esc(a.name)}",""" +
+              s""""isExplicit":false,"annotation":"${esc(a.name)}","signature":"${esc(m.code)}","chain":[]}"""
+          )
+          handled += ep
+        }
+      }
+    }
+  }
 
   if (allOwnershipIds.nonEmpty && endpoints.nonEmpty) {
     // The endpoint method is itself an ownership method (reachability skips self-loops).
