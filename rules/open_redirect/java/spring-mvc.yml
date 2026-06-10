@@ -1,0 +1,44 @@
+rules:
+  - id: java-open-redirect-sinks-spring-mvc
+    message: >-
+      Potentially unsafe redirect using Spring MVC view resolution detected. A
+      "redirect:" view name or RedirectView built from user-controlled input could
+      allow an open redirect (CWE-601).
+    severity: HIGH
+    metadata:
+      category: security
+      cwe: "CWE-601: URL Redirection to Untrusted Site ('Open Redirect')"
+      technology:
+        - java
+        - spring
+      subcategory:
+        - vuln
+      confidence: HIGH
+      library_group: "spring-mvc"
+    languages:
+      - java
+    mode: taint
+
+    pattern-sources:
+      - pattern: $ANYTHING
+
+    pattern-sinks:
+      - pattern-either:
+          # ========================================
+          # "redirect:" view-name string built from input
+          # ========================================
+          - pattern: '"redirect:" + $TAINT'
+          - pattern: '"redirect:" + $TAINT + ...'
+
+          # ========================================
+          # Spring RedirectView
+          # ========================================
+          - pattern: new org.springframework.web.servlet.view.RedirectView($TAINT)
+          - pattern: new org.springframework.web.servlet.view.RedirectView($TAINT, ...)
+          - pattern: (org.springframework.web.servlet.view.RedirectView $RV).setUrl($TAINT)
+
+          # ========================================
+          # Spring ModelAndView with a redirect view name
+          # ========================================
+          - pattern: new org.springframework.web.servlet.ModelAndView($TAINT, ...)
+          - pattern: (org.springframework.web.servlet.ModelAndView $MAV).setViewName($TAINT)

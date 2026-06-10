@@ -1,0 +1,46 @@
+rules:
+  - id: java-ldap-injection-sinks
+    message: >-
+      Potentially unsafe LDAP search detected. This sink could allow LDAP injection
+      (CWE-90) if a user-controlled filter or distinguished name reaches it without
+      escaping or parameterization.
+    severity: HIGH
+    metadata:
+      category: security
+      cwe: "CWE-90: Improper Neutralization of Special Elements used in an LDAP Query ('LDAP Injection')"
+      technology:
+        - java
+      subcategory:
+        - vuln
+      confidence: HIGH
+      library_group: "ldap"
+    languages:
+      - java
+    mode: taint
+
+    pattern-sources:
+      - pattern: $ANYTHING
+
+    pattern-sinks:
+      - pattern-either:
+          # ========================================
+          # JNDI DirContext / InitialDirContext (filter is the 2nd argument)
+          # ========================================
+          - pattern: (javax.naming.directory.DirContext $CTX).search($BASE, $FILTER, ...)
+          - pattern: (javax.naming.directory.InitialDirContext $CTX).search($BASE, $FILTER, ...)
+          - pattern: (jakarta.naming.directory.DirContext $CTX).search($BASE, $FILTER, ...)
+          - pattern: (jakarta.naming.directory.InitialDirContext $CTX).search($BASE, $FILTER, ...)
+
+          # ========================================
+          # Spring LDAP
+          # ========================================
+          - pattern: (org.springframework.ldap.core.LdapTemplate $T).search($BASE, $FILTER, ...)
+          - pattern: (org.springframework.ldap.core.LdapTemplate $T).searchForObject($BASE, $FILTER, ...)
+          - pattern: (org.springframework.ldap.core.LdapTemplate $T).searchForContext($BASE, $FILTER, ...)
+
+          # ========================================
+          # UnboundID LDAP SDK
+          # ========================================
+          - pattern: com.unboundid.ldap.sdk.Filter.create($TAINT)
+          - pattern: (com.unboundid.ldap.sdk.LDAPConnection $CONN).search($BASE, $SCOPE, $FILTER, ...)
+          - pattern: new com.unboundid.ldap.sdk.SearchRequest($BASE, $SCOPE, $FILTER, ...)

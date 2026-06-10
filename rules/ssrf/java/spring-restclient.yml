@@ -1,0 +1,56 @@
+rules:
+  - id: java-ssrf-sinks-spring-restclient
+    message: >-
+      Potentially unsafe outbound network request using Spring's RestClient (Spring
+      6.1+) or a dynamically configured WebClient/RestClient base URL detected. This
+      sink could allow SSRF if user-controlled input reaches this point.
+    severity: HIGH
+    metadata:
+      category: security
+      cwe: "CWE-918: Server-Side Request Forgery (SSRF)"
+      technology:
+        - java
+        - spring
+      subcategory:
+        - vuln
+      confidence: HIGH
+      library_group: "spring-restclient"
+    languages:
+      - java
+    mode: taint
+
+    pattern-sources:
+      - pattern: $ANYTHING
+
+    pattern-sinks:
+      - pattern-either:
+          # ========================================
+          # Spring RestClient (synchronous, Spring 6.1+)
+          # ========================================
+
+          # RequestHeadersUriSpec / RequestBodyUriSpec - URI is where input enters
+          - pattern: (org.springframework.web.client.RestClient.RequestHeadersUriSpec $SPEC).uri($TAINT)
+          - pattern: (org.springframework.web.client.RestClient.RequestHeadersUriSpec $SPEC).uri($TAINT, ...)
+          - pattern: (org.springframework.web.client.RestClient.RequestBodyUriSpec $SPEC).uri($TAINT)
+          - pattern: (org.springframework.web.client.RestClient.RequestBodyUriSpec $SPEC).uri($TAINT, ...)
+
+          # RestClient fluent method chaining
+          - pattern: (org.springframework.web.client.RestClient $RC).get().uri($TAINT)
+          - pattern: (org.springframework.web.client.RestClient $RC).post().uri($TAINT)
+          - pattern: (org.springframework.web.client.RestClient $RC).put().uri($TAINT)
+          - pattern: (org.springframework.web.client.RestClient $RC).patch().uri($TAINT)
+          - pattern: (org.springframework.web.client.RestClient $RC).delete().uri($TAINT)
+          - pattern: (org.springframework.web.client.RestClient $RC).head().uri($TAINT)
+          - pattern: (org.springframework.web.client.RestClient $RC).method(...).uri($TAINT)
+
+          # ========================================
+          # Dynamic base-URL / factory entry points
+          # ========================================
+
+          # RestClient creation with a dynamic base URL
+          - pattern: org.springframework.web.client.RestClient.create($TAINT)
+          - pattern: (org.springframework.web.client.RestClient.Builder $B).baseUrl($TAINT)
+
+          # WebClient creation with a dynamic base URL
+          - pattern: org.springframework.web.reactive.function.client.WebClient.create($TAINT)
+          - pattern: (org.springframework.web.reactive.function.client.WebClient.Builder $B).baseUrl($TAINT)

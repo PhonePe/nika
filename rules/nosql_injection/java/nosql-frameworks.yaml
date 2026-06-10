@@ -1,0 +1,61 @@
+rules:
+  - id: java-nosql-injection-sinks-libraries
+    message: >-
+      Potentially unsafe NoSQL query construction detected via an additional NoSQL
+      client library or ODM. This sink could allow NoSQL injection (CWE-943) if
+      user-controlled input reaches a query string, filter, or raw query document
+      without safe binding.
+    severity: HIGH
+    metadata:
+      category: security
+      cwe: "CWE-943: Improper Neutralization of Special Elements in Data Query Logic"
+      technology:
+        - java
+        - jersey
+        - dropwizard
+      subcategory:
+        - vuln
+      confidence: HIGH
+      library_group: "nosql"
+    languages:
+      - java
+    mode: taint
+
+    pattern-sources:
+      - pattern: $ANYTHING
+
+    pattern-sinks:
+      - pattern-either:
+          # ========================================
+          # Jongo (MongoDB query strings)
+          # ========================================
+          - pattern: (org.jongo.MongoCollection $C).find($TAINT)
+          - pattern: (org.jongo.MongoCollection $C).find($TAINT, ...)
+          - pattern: (org.jongo.MongoCollection $C).findOne($TAINT)
+          - pattern: (org.jongo.MongoCollection $C).findOne($TAINT, ...)
+          - pattern: (org.jongo.MongoCollection $C).count($TAINT)
+          - pattern: (org.jongo.MongoCollection $C).remove($TAINT)
+          - pattern: (org.jongo.MongoCollection $C).update($TAINT)
+          - pattern: (org.jongo.MongoCollection $C).aggregate($TAINT)
+
+          # ========================================
+          # Morphia ODM (string-based filter conditions)
+          # ========================================
+          - pattern: (dev.morphia.query.Query $Q).filter($TAINT, ...)
+          - pattern: (org.mongodb.morphia.query.Query $Q).filter($TAINT, ...)
+
+          # ========================================
+          # Elasticsearch query injection (raw JSON / query_string)
+          # ========================================
+          - pattern: org.elasticsearch.index.query.QueryBuilders.wrapperQuery($TAINT)
+          - pattern: org.elasticsearch.index.query.QueryBuilders.queryStringQuery($TAINT)
+          - pattern: org.elasticsearch.index.query.QueryBuilders.simpleQueryStringQuery($TAINT)
+
+          # ========================================
+          # Cassandra CQL (CQL string execution)
+          # ========================================
+          - pattern: (com.datastax.driver.core.Session $S).execute($TAINT)
+          - pattern: (com.datastax.driver.core.Session $S).execute($TAINT, ...)
+          - pattern: (com.datastax.oss.driver.api.core.CqlSession $S).execute($TAINT)
+          - pattern: com.datastax.oss.driver.api.core.cql.SimpleStatement.newInstance($TAINT)
+          - pattern: com.datastax.oss.driver.api.core.cql.SimpleStatement.builder($TAINT)

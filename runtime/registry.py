@@ -7,6 +7,7 @@ from vulnerabilities.command_injection import CommandInjectionVulnerability
 from vulnerabilities.deserialization import DeserializationVulnerability
 from vulnerabilities.idor.vulnerability import IdorVulnerability
 from vulnerabilities.insecure_crypto import InsecureCryptoVulnerability
+from vulnerabilities.open_redirect import OpenRedirectVulnerability
 from vulnerabilities.order_scan import OrderScanVulnerability
 from vulnerabilities.path_traversal import PathTraversalVulnerability
 from vulnerabilities.sensitive_logging.vulnerability import SensitiveLoggingVulnerability
@@ -14,8 +15,10 @@ from vulnerabilities.ssrf import SsrfVulnerability
 from vulnerabilities.sql_injection import SqlInjectionVulnerability
 from vulnerabilities.template_injection import TemplateInjectionVulnerability
 from vulnerabilities.unsafe_reflection import UnsafeReflectionVulnerability
+from vulnerabilities.xpath_injection import XpathInjectionVulnerability
 from vulnerabilities.xxe import XxeVulnerability
-
+from vulnerabilities.ldap_injection import LdapInjectionVulnerability
+from vulnerabilities.nosql_injection import NoSqlInjectionVulnerability
 
 class _EngineEntry:
     __slots__ = ("factory", "requires_path")
@@ -65,6 +68,10 @@ def build_default_registry():
     registry.register_vulnerability("sensitive_logging", SensitiveLoggingVulnerability)
     registry.register_vulnerability("sql_injection", SqlInjectionVulnerability)
     registry.register_vulnerability("ssrf", SsrfVulnerability)
+    registry.register_vulnerability("open_redirect", OpenRedirectVulnerability)
+    registry.register_vulnerability("ldap_injection", LdapInjectionVulnerability)
+    registry.register_vulnerability("nosql_injection", NoSqlInjectionVulnerability)
+    registry.register_vulnerability("xpath_injection", XpathInjectionVulnerability)
     registry.register_vulnerability("xxe", XxeVulnerability)
     registry.register_vulnerability("path_traversal", PathTraversalVulnerability)
     registry.register_vulnerability("command_injection", CommandInjectionVulnerability)

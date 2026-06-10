@@ -1,0 +1,41 @@
+rules:
+  - id: java-open-redirect-sinks-servlet
+    message: >-
+      Potentially unsafe redirect using the Servlet API detected. This sink could
+      allow an open redirect (CWE-601) if user-controlled input reaches the
+      destination URL or Location header.
+    severity: HIGH
+    metadata:
+      category: security
+      cwe: "CWE-601: URL Redirection to Untrusted Site ('Open Redirect')"
+      technology:
+        - java
+        - servlet
+      subcategory:
+        - vuln
+      confidence: HIGH
+      library_group: "servlet"
+    languages:
+      - java
+    mode: taint
+
+    pattern-sources:
+      - pattern: $ANYTHING
+
+    pattern-sinks:
+      - pattern-either:
+          # ========================================
+          # HttpServletResponse.sendRedirect()
+          # ========================================
+          - pattern: (javax.servlet.http.HttpServletResponse $RESP).sendRedirect($TAINT)
+          - pattern: (javax.servlet.http.HttpServletResponse $RESP).sendRedirect($TAINT, ...)
+          - pattern: (jakarta.servlet.http.HttpServletResponse $RESP).sendRedirect($TAINT)
+          - pattern: (jakarta.servlet.http.HttpServletResponse $RESP).sendRedirect($TAINT, ...)
+
+          # ========================================
+          # Location header set directly on the response
+          # ========================================
+          - pattern: (javax.servlet.http.HttpServletResponse $RESP).setHeader("Location", $TAINT)
+          - pattern: (javax.servlet.http.HttpServletResponse $RESP).addHeader("Location", $TAINT)
+          - pattern: (jakarta.servlet.http.HttpServletResponse $RESP).setHeader("Location", $TAINT)
+          - pattern: (jakarta.servlet.http.HttpServletResponse $RESP).addHeader("Location", $TAINT)

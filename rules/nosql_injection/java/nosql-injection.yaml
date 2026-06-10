@@ -1,0 +1,63 @@
+rules:
+  - id: java-nosql-injection-sinks
+    message: >-
+      Potentially unsafe NoSQL query construction detected. This sink could allow
+      NoSQL injection (CWE-943) if user-controlled input reaches a query document,
+      a $where/JavaScript expression, or a query string without safe binding.
+    severity: HIGH
+    metadata:
+      category: security
+      cwe: "CWE-943: Improper Neutralization of Special Elements in Data Query Logic"
+      technology:
+        - java
+      subcategory:
+        - vuln
+      confidence: HIGH
+      library_group: "nosql"
+    languages:
+      - java
+    mode: taint
+
+    pattern-sources:
+      - pattern: $ANYTHING
+
+    pattern-sinks:
+      - pattern-either:
+          # ========================================
+          # MongoDB driver - parsing JSON into a query document
+          # ========================================
+          - pattern: org.bson.Document.parse($TAINT)
+          - pattern: org.bson.Document.parse($TAINT, ...)
+          - pattern: com.mongodb.BasicDBObject.parse($TAINT)
+          - pattern: com.mongodb.BasicDBObject.parse($TAINT, ...)
+          - pattern: com.mongodb.util.JSON.parse($TAINT)
+
+          # ========================================
+          # MongoDB $where / JavaScript expressions
+          # ========================================
+          - pattern: com.mongodb.client.model.Filters.where($TAINT)
+          - pattern: new com.mongodb.BasicDBObject("$where", $TAINT)
+          - pattern: ($O).append("$where", $TAINT)
+          - pattern: ($O).put("$where", $TAINT)
+
+          # ========================================
+          # MongoDB legacy eval / runCommand with dynamic document
+          # ========================================
+          - pattern: (com.mongodb.DB $DB).eval($TAINT, ...)
+          - pattern: (com.mongodb.client.MongoDatabase $DB).runCommand($TAINT)
+          - pattern: (com.mongodb.client.MongoDatabase $DB).runCommand($TAINT, ...)
+
+          # ========================================
+          # Spring Data MongoDB - BasicQuery from a JSON string
+          # ========================================
+          - pattern: new org.springframework.data.mongodb.core.query.BasicQuery($TAINT)
+          - pattern: new org.springframework.data.mongodb.core.query.BasicQuery($TAINT, ...)
+
+          # ========================================
+          # Couchbase N1QL query strings
+          # ========================================
+          - pattern: com.couchbase.client.java.query.N1qlQuery.simple($TAINT)
+          - pattern: com.couchbase.client.java.query.Query.simple($TAINT)
+          - pattern: (com.couchbase.client.java.Cluster $C).query($TAINT)
+          - pattern: (com.couchbase.client.java.Cluster $C).query($TAINT, ...)
+          - pattern: (com.couchbase.client.java.Bucket $B).query($TAINT)

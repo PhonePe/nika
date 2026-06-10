@@ -1,0 +1,39 @@
+rules:
+  - id: java-open-redirect-sinks-spring-security
+    message: >-
+      Potentially unsafe redirect using a Spring Security RedirectStrategy or
+      authentication handler detected. A target URL built from user-controlled
+      input could allow an open redirect (CWE-601).
+    severity: HIGH
+    metadata:
+      category: security
+      cwe: "CWE-601: URL Redirection to Untrusted Site ('Open Redirect')"
+      technology:
+        - java
+        - spring-security
+      subcategory:
+        - vuln
+      confidence: HIGH
+      library_group: "spring-security"
+    languages:
+      - java
+    mode: taint
+
+    pattern-sources:
+      - pattern: $ANYTHING
+
+    pattern-sinks:
+      - pattern-either:
+          # ========================================
+          # RedirectStrategy.sendRedirect()
+          # ========================================
+          - pattern: (org.springframework.security.web.RedirectStrategy $RS).sendRedirect(..., $TAINT)
+          - pattern: (org.springframework.security.web.RedirectStrategy $RS).sendRedirect(..., $TAINT, ...)
+          - pattern: (org.springframework.security.web.DefaultRedirectStrategy $RS).sendRedirect(..., $TAINT)
+          - pattern: (org.springframework.security.web.DefaultRedirectStrategy $RS).sendRedirect(..., $TAINT, ...)
+
+          # ========================================
+          # Authentication success/failure handler target URLs
+          # ========================================
+          - pattern: $H.setDefaultTargetUrl($TAINT)
+          - pattern: $H.setDefaultFailureUrl($TAINT)

@@ -15,16 +15,19 @@ vulnerabilityConfig:
    - command_injection
    - code_injection
    - order_scan
-   - command_injection
    - sqli
    - path_traversal
    - ssrf
+   - open_redirect
    - template_injection
    - deserialization
    - cryptographic_failure
    - unsafe_reflection
    - xxe
    - idor
+   - ldap_injection
+   - xpath_injection
+   - nosql_injection
 
 sources:
   annotations:
@@ -59,7 +62,7 @@ vulnerabilityArgs:
       - { name: "checkUserOwnership", resource: "userId" }
       - { name: "checkOrderOwnership", resource: "orderId" }
     ownership_check_annotations: ["PreAuthorize", "PostAuthorize", "PreFilter", "PostFilter"]
-    auto_detect_ownership: true
+    auto_detect_ownership: false
     principal_markers:
       - "SecurityContextHolder"
       - "getAuthentication"
@@ -78,7 +81,7 @@ vulnerabilityArgs:
       - "AuthenticationPrincipal"
     ownership_requires_identifier_param: true
     require_ownership_comparison: true
-    exclude_when_ownership_found: true
+    exclude_when_ownership_found: false
 
 tools:
   astrail:

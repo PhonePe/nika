@@ -1,0 +1,60 @@
+rules:
+  - id: java-open-redirect-sinks-misc-frameworks
+    message: >-
+      Potentially unsafe redirect using a web micro-framework detected. A redirect
+      target built from user-controlled input could allow an open redirect (CWE-601).
+      Covers Play, Spark, Javalin and Micronaut.
+    severity: HIGH
+    metadata:
+      category: security
+      cwe: "CWE-601: URL Redirection to Untrusted Site ('Open Redirect')"
+      technology:
+        - java
+        - play
+        - spark
+        - javalin
+        - micronaut
+      subcategory:
+        - vuln
+      confidence: HIGH
+      library_group: "misc-frameworks"
+    languages:
+      - java
+    mode: taint
+
+    pattern-sources:
+      - pattern: $ANYTHING
+
+    pattern-sinks:
+      - pattern-either:
+          # ========================================
+          # Play Framework (Java API) - static Results
+          # ========================================
+          - pattern: play.mvc.Results.redirect($TAINT)
+          - pattern: play.mvc.Results.redirect($TAINT, ...)
+          - pattern: play.mvc.Results.temporaryRedirect($TAINT)
+          - pattern: play.mvc.Results.movedPermanently($TAINT)
+          - pattern: play.mvc.Results.seeOther($TAINT)
+          - pattern: play.mvc.Results.found($TAINT)
+          - pattern: play.mvc.Controller.redirect($TAINT)
+
+          # ========================================
+          # Spark Java (com.sparkjava)
+          # ========================================
+          - pattern: (spark.Response $RESP).redirect($TAINT)
+          - pattern: (spark.Response $RESP).redirect($TAINT, ...)
+
+          # ========================================
+          # Javalin
+          # ========================================
+          - pattern: (io.javalin.http.Context $CTX).redirect($TAINT)
+          - pattern: (io.javalin.http.Context $CTX).redirect($TAINT, ...)
+
+          # ========================================
+          # Micronaut HTTP responses
+          # ========================================
+          - pattern: io.micronaut.http.HttpResponse.redirect($TAINT)
+          - pattern: io.micronaut.http.HttpResponse.redirect($TAINT, ...)
+          - pattern: io.micronaut.http.HttpResponse.seeOther($TAINT)
+          - pattern: io.micronaut.http.HttpResponse.temporaryRedirect($TAINT)
+          - pattern: io.micronaut.http.HttpResponse.permanentRedirect($TAINT)

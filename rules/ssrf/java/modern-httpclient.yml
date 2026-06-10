@@ -28,7 +28,11 @@ rules:
           
           # Request.Builder.url() - sets target URL for request
           - pattern: (okhttp3.Request.Builder $BUILDER).url($TAINT)
-          
+
+          # HttpUrl parsing/builder - where a dynamic URL string enters OkHttp
+          - pattern: okhttp3.HttpUrl.parse($TAINT)
+          - pattern: okhttp3.HttpUrl.get($TAINT)
+
           # OkHttpClient.newCall().execute() - synchronous request execution
           - pattern: (okhttp3.Call $CALL).execute()
           

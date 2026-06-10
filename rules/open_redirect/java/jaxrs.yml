@@ -1,0 +1,46 @@
+rules:
+  - id: java-open-redirect-sinks-jaxrs
+    message: >-
+      Potentially unsafe redirect using the JAX-RS Response API detected. A redirect
+      target or Location header built from user-controlled input could allow an open
+      redirect (CWE-601). Covers Jersey, Dropwizard, RESTEasy and CXF, which all build
+      redirects through the standard JAX-RS Response API.
+    severity: HIGH
+    metadata:
+      category: security
+      cwe: "CWE-601: URL Redirection to Untrusted Site ('Open Redirect')"
+      technology:
+        - java
+        - jax-rs
+        - jersey
+        - dropwizard
+      subcategory:
+        - vuln
+      confidence: HIGH
+      library_group: "jaxrs"
+    languages:
+      - java
+    mode: taint
+
+    pattern-sources:
+      - pattern: $ANYTHING
+
+    pattern-sinks:
+      - pattern-either:
+          # ========================================
+          # JAX-RS 2.x (javax.ws.rs)
+          # ========================================
+          - pattern: javax.ws.rs.core.Response.seeOther($TAINT)
+          - pattern: javax.ws.rs.core.Response.temporaryRedirect($TAINT)
+          - pattern: javax.ws.rs.core.Response.created($TAINT)
+          - pattern: (javax.ws.rs.core.Response.ResponseBuilder $B).location($TAINT)
+          - pattern: (javax.ws.rs.core.Response.ResponseBuilder $B).contentLocation($TAINT)
+
+          # ========================================
+          # Jakarta EE (jakarta.ws.rs)
+          # ========================================
+          - pattern: jakarta.ws.rs.core.Response.seeOther($TAINT)
+          - pattern: jakarta.ws.rs.core.Response.temporaryRedirect($TAINT)
+          - pattern: jakarta.ws.rs.core.Response.created($TAINT)
+          - pattern: (jakarta.ws.rs.core.Response.ResponseBuilder $B).location($TAINT)
+          - pattern: (jakarta.ws.rs.core.Response.ResponseBuilder $B).contentLocation($TAINT)

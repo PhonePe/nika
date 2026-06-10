@@ -1,0 +1,43 @@
+rules:
+  - id: java-open-redirect-sinks-spring-response-entity
+    message: >-
+      Potentially unsafe Location header set on a Spring ResponseEntity detected.
+      A redirect location built from user-controlled input could allow an open
+      redirect (CWE-601).
+    severity: HIGH
+    metadata:
+      category: security
+      cwe: "CWE-601: URL Redirection to Untrusted Site ('Open Redirect')"
+      technology:
+        - java
+        - spring
+      subcategory:
+        - vuln
+      confidence: HIGH
+      library_group: "spring-response-entity"
+    languages:
+      - java
+    mode: taint
+
+    pattern-sources:
+      - pattern: $ANYTHING
+
+    pattern-sinks:
+      - pattern-either:
+          # ========================================
+          # ResponseEntity location / Location header
+          # ========================================
+          - pattern: (org.springframework.http.ResponseEntity.BodyBuilder $B).location($TAINT)
+          - pattern: (org.springframework.http.ResponseEntity.HeadersBuilder $B).location($TAINT)
+          - pattern: org.springframework.http.ResponseEntity.created($TAINT)
+
+          # ResponseEntity / builder Location header set explicitly
+          - pattern: $B.header("Location", $TAINT)
+          - pattern: $B.header("Location", $TAINT, ...)
+
+          # ========================================
+          # HttpHeaders Location
+          # ========================================
+          - pattern: (org.springframework.http.HttpHeaders $H).setLocation($TAINT)
+          - pattern: (org.springframework.http.HttpHeaders $H).add("Location", $TAINT)
+          - pattern: (org.springframework.http.HttpHeaders $H).set("Location", $TAINT)

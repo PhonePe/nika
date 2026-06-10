@@ -1,0 +1,42 @@
+rules:
+  - id: java-open-redirect-sinks-vertx
+    message: >-
+      Potentially unsafe redirect using Vert.x Web detected. A redirect target or
+      Location header built from user-controlled input could allow an open redirect
+      (CWE-601).
+    severity: HIGH
+    metadata:
+      category: security
+      cwe: "CWE-601: URL Redirection to Untrusted Site ('Open Redirect')"
+      technology:
+        - java
+        - vertx
+      subcategory:
+        - vuln
+      confidence: HIGH
+      library_group: "vertx"
+    languages:
+      - java
+    mode: taint
+
+    pattern-sources:
+      - pattern: $ANYTHING
+
+    pattern-sinks:
+      - pattern-either:
+          # ========================================
+          # Vert.x Web RoutingContext.redirect()
+          # ========================================
+          - pattern: (io.vertx.ext.web.RoutingContext $CTX).redirect($TAINT)
+          - pattern: (io.vertx.ext.web.RoutingContext $CTX).redirect($TAINT, ...)
+
+          # ========================================
+          # HttpServerResponse Location header
+          # ========================================
+          - pattern: (io.vertx.core.http.HttpServerResponse $RESP).putHeader("Location", $TAINT)
+          - pattern: (io.vertx.core.http.HttpServerResponse $RESP).putHeader("location", $TAINT)
+          - pattern: (io.vertx.core.http.HttpServerResponse $RESP).redirect($TAINT)
+
+          # Reactive / RxJava bindings of HttpServerResponse
+          - pattern: (io.vertx.reactivex.core.http.HttpServerResponse $RESP).putHeader("Location", $TAINT)
+          - pattern: (io.vertx.reactivex.core.http.HttpServerResponse $RESP).putHeader("location", $TAINT)

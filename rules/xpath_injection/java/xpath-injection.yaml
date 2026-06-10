@@ -1,0 +1,57 @@
+rules:
+  - id: java-xpath-injection-sinks
+    message: >-
+      Potentially unsafe XPath compilation/evaluation detected. This sink could allow
+      XPath injection (CWE-643) if a user-controlled expression reaches it without
+      variable binding or validation.
+    severity: HIGH
+    metadata:
+      category: security
+      cwe: "CWE-643: Improper Neutralization of Data within XPath Expressions ('XPath Injection')"
+      technology:
+        - java
+      subcategory:
+        - vuln
+      confidence: HIGH
+      library_group: "xpath"
+    languages:
+      - java
+    mode: taint
+
+    pattern-sources:
+      - pattern: $ANYTHING
+
+    pattern-sinks:
+      - pattern-either:
+          # ========================================
+          # javax.xml.xpath (JAXP)
+          # ========================================
+          - pattern: (javax.xml.xpath.XPath $XP).compile($TAINT)
+          - pattern: (javax.xml.xpath.XPath $XP).evaluate($TAINT, ...)
+          - pattern: (javax.xml.xpath.XPath $XP).evaluateExpression($TAINT, ...)
+
+          # ========================================
+          # Apache Xalan XPathAPI (legacy)
+          # ========================================
+          - pattern: org.apache.xpath.XPathAPI.eval($NODE, $TAINT, ...)
+          - pattern: org.apache.xpath.XPathAPI.selectNodeList($NODE, $TAINT, ...)
+          - pattern: org.apache.xpath.XPathAPI.selectSingleNode($NODE, $TAINT, ...)
+          - pattern: org.apache.xpath.XPathAPI.selectNodeIterator($NODE, $TAINT, ...)
+
+          # ========================================
+          # dom4j
+          # ========================================
+          - pattern: (org.dom4j.Node $N).selectNodes($TAINT)
+          - pattern: (org.dom4j.Node $N).selectNodes($TAINT, ...)
+          - pattern: (org.dom4j.Node $N).selectSingleNode($TAINT)
+          - pattern: (org.dom4j.Node $N).valueOf($TAINT)
+          - pattern: (org.dom4j.Node $N).numberValueOf($TAINT)
+          - pattern: org.dom4j.DocumentHelper.createXPath($TAINT)
+
+          # ========================================
+          # JDOM
+          # ========================================
+          - pattern: (org.jdom2.xpath.XPathFactory $F).compile($TAINT, ...)
+          - pattern: org.jdom.xpath.XPath.newInstance($TAINT)
+          - pattern: org.jdom.xpath.XPath.selectNodes($NODE, $TAINT)
+          - pattern: org.jdom.xpath.XPath.selectSingleNode($NODE, $TAINT)
