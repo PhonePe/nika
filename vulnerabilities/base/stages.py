@@ -192,7 +192,7 @@ def _finding_from_sink(vulnerability_id, sink, review=None, trace=None, metadata
         remediation=review.get("remediation"),
         code_fix=review.get("code_fix"),
         trace=trace,
-        metadata=metadata or {},
+        metadata=metadata or getattr(sink, "metadata", None) or {},
     )
 
 
