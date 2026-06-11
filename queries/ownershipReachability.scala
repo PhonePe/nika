@@ -219,17 +219,32 @@ def findOwnershipReachable(
   val results = mutable.ArrayBuffer[String]()
   val handled = mutable.Set[String]()
 
-  val annoOwnSeq = ownershipAnnotations.toSeq
-  if (annoOwnSeq.nonEmpty) {
-    for ((ep, _epIds) <- endpointEntries if !handled.contains(ep)) {
+  // Ownership annotations.
+  val annotationSpecs: Seq[(String, Option[String], Option[String])] =
+    ownershipAnnotations.toSeq.map { e =>
+      val parts = e.split("::", -1)
+      val name = parts(0)
+      val repoOpt = if (parts.length >= 2 && parts(1).nonEmpty) Some(parts(1).toLowerCase) else None
+      val resOpt = if (parts.length >= 3 && parts(2).nonEmpty) Some(parts(2)) else None
+      (name, repoOpt, resOpt)
+    }
+  if (annotationSpecs.nonEmpty) {
+    for ((ep, epIds) <- endpointEntries if !handled.contains(ep)) {
       cpg.method.fullNameExact(ep).headOption.foreach { m =>
-        m.annotation.find { a =>
+        val matched = m.annotation.l.flatMap { a =>
           val fn = a.fullName
-          annoOwnSeq.exists(x => a.name == x || (fn != null && (fn == x || fn.endsWith("." + x))))
-        }.foreach { a =>
+          val spec = annotationSpecs.find {
+            case (name, repoOpt, resOpt) =>
+              (a.name == name || (fn != null && (fn == name || fn.endsWith("." + name)))) &&
+                repoOpt.forall(r => fileMatchesRepo(m.filename, r)) &&
+                resOpt.forall(r => resourceMatchesEndpoint(epIds, r))
+          }
+          spec.map(_ => a.name)
+        }.headOption
+        matched.foreach { annoName =>
           results.append(
-            s"""{"endpoint":"${esc(ep)}","protected":true,"reachedMethod":"@${esc(a.name)}",""" +
-              s""""isExplicit":true,"annotation":"${esc(a.name)}","signature":"${esc(m.code)}","chain":[]}"""
+            s"""{"endpoint":"${esc(ep)}","protected":true,"reachedMethod":"@${esc(annoName)}",""" +
+              s""""isExplicit":true,"annotation":"${esc(annoName)}","signature":"${esc(m.code)}","chain":[]}"""
           )
           handled += ep
         }
