@@ -15,7 +15,7 @@ vulnerabilityConfig:
    - command_injection
    - code_injection
    - order_scan
-   - sqli
+   - sql_injection
    - path_traversal
    - ssrf
    - open_redirect

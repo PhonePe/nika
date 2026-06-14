@@ -1,0 +1,49 @@
+# Golden fixtures.
+#
+# positive: each category maps to the fixture file that plants exactly one instance of that
+#   vulnerability. The category passes when the scanner reports a finding in that file.
+#   `xfail: <reason>` marks a known gap (reported but not asserted) so it stays visible.
+#
+# negative: safe/remediated code that must NOT be reported (false-positive guard).
+
+positive:
+  sql_injection:
+    fixture: SqlInjectionController.java
+  command_injection:
+    fixture: CommandInjectionController.java
+  code_injection:
+    fixture: CodeInjectionController.java
+  path_traversal:
+    fixture: PathTraversalController.java
+  ssrf:
+    fixture: SsrfController.java
+  xxe:
+    fixture: XxeController.java
+  deserialization:
+    fixture: DeserializationController.java
+  unsafe_reflection:
+    fixture: UnsafeReflectionController.java
+  ldap_injection:
+    fixture: LdapInjectionController.java
+  nosql_injection:
+    fixture: NoSqlInjectionController.java
+  xpath_injection:
+    fixture: XpathInjectionController.java
+  template_injection:
+    fixture: TemplateInjectionController.java
+  open_redirect:
+    fixture: OpenRedirectController.java
+  cryptographic_failure:
+    fixture: CryptoController.java
+  sensitive_logging:
+    fixture: SensitiveLoggingController.java
+  idor:
+    fixture: IdorController.java
+  order_scan:
+    fixture: Example.java
+
+negative:
+  sql_injection:
+    fixture: SafeSqlController.java
+  idor:
+    fixture: SafeIdorController.java
