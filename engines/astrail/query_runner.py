@@ -18,6 +18,17 @@ def _get_config():
     return ConfigProvider.get_config()
 
 
+def _scala_literal(value: str) -> str:
+    escaped = (
+        str(value)
+        .replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+    )
+    return f'"{escaped}"'
+
+
 class AstrailQueryRunner:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
@@ -69,7 +80,9 @@ class AstrailQueryRunner:
         url = astrail_server.get_query_sync_url()
 
         try:
-            response = http.post(url, json={"query": query}, timeout=timeout)
+            response = http.post(
+                url, json={"query": query}, timeout=timeout, auth=astrail_server.get_auth()
+            )
             response.raise_for_status()
             return response.json()
         except requests.exceptions.ConnectionError:
@@ -251,7 +264,7 @@ def execute_once = {{
                     annotations.append(token)
 
         annotations_list_str = ", ".join(
-            f'"{annotation[1:]}"' if annotation.startswith("@") else f'"{annotation}"'
+            _scala_literal(annotation[1:] if annotation.startswith("@") else annotation)
             for annotation in annotations
         )
         result = self._execute_scala_query(

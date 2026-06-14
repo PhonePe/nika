@@ -3,7 +3,7 @@ import sys
 from types import SimpleNamespace
 
 from config_provider import ConfigProvider
-from engines.astrail.query_runner import AstrailQueryRunner
+from engines.astrail.query_runner import AstrailQueryRunner, _scala_literal
 from engines.astrail.translators import (
     translate_batch_reachability,
     translate_sources,
@@ -40,7 +40,7 @@ class AstrailEngine:
             sys.exit(1)
         logging.info("Loading CPG into Astrail from %s", query_runner.cpg_file_path)
         import_result = query_runner.execute_query_once(
-            f'importCpg("{query_runner.cpg_file_path}")'
+            f"importCpg({_scala_literal(query_runner.cpg_file_path)})"
         )
         if import_result.get("success") is False:
             raise RuntimeError(

@@ -1,9 +1,11 @@
 import atexit
+import base64
 import contextlib
 import tempfile
 import json
 import logging
 import os
+import secrets
 import signal
 import subprocess
 import threading
@@ -30,6 +32,20 @@ class AstrailServer:
         self.__port = _get_astrail_config().get("port", 9001)
         self.__registered_cleanup = False
         self.__log_file = None
+        self.__auth_username = None
+        self.__auth_password = None
+
+    def get_auth(self) -> tuple[str, str] | None:
+        if self.__auth_username and self.__auth_password:
+            return (self.__auth_username, self.__auth_password)
+        return None
+
+    def _auth_header(self) -> dict:
+        auth = self.get_auth()
+        if not auth:
+            return {}
+        token = base64.b64encode(f"{auth[0]}:{auth[1]}".encode("utf-8")).decode("ascii")
+        return {"Authorization": f"Basic {token}"}
 
     def _build_log_file_path(self, port: int) -> str:
         return os.path.join(tempfile.gettempdir(), f"crt-astrail-server-{port}.log")
@@ -69,16 +85,26 @@ class AstrailServer:
 
         self.__port = port
         self.__log_file = self._build_log_file_path(port)
+
+        bind_host = self._get_connect_host()
+        self.__auth_username = "nika"
+        self.__auth_password = secrets.token_urlsafe(32)
+
         cmd = [
             astrail_path,
             "--server",
             "--server-host",
-            "0.0.0.0",
+            bind_host,
             "--server-port",
             str(port),
+            "--server-auth-username",
+            self.__auth_username,
+            "--server-auth-password",
+            self.__auth_password,
         ]
 
-        logging.info(f"[astrail] Starting HTTP server: {' '.join(cmd)}")
+        redacted = ["***" if token == self.__auth_password else token for token in cmd]
+        logging.info(f"[astrail] Starting HTTP server: {' '.join(redacted)}")
         with open(self.__log_file, "ab") as log_handle:
             self.__server_process = subprocess.Popen(
                 cmd,
@@ -110,7 +136,7 @@ class AstrailServer:
             )
 
         logging.info(
-            f"[astrail] HTTP server running at http://0.0.0.0:{port} "
+            f"[astrail] HTTP server running at http://{self._get_connect_host()}:{port} "
             f"(PID: {self.__server_process.pid})"
         )
 
@@ -127,7 +153,7 @@ class AstrailServer:
                 req = request.Request(
                     url,
                     data=payload,
-                    headers={"Content-Type": "application/json"},
+                    headers={"Content-Type": "application/json", **self._auth_header()},
                     method="POST",
                 )
                 with request.urlopen(req, timeout=2) as response:
@@ -183,6 +209,8 @@ class AstrailServer:
 
         self.__server_process = None
         self.__cpg_path = None
+        self.__auth_username = None
+        self.__auth_password = None
         if remove_log and self.__log_file and os.path.exists(self.__log_file):
             with contextlib.suppress(OSError):
                 os.remove(self.__log_file)

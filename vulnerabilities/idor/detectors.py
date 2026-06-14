@@ -1,4 +1,5 @@
 import re
+import os
 
 _PATH_VAR_RE = re.compile(r"\{\s*([A-Za-z_$][\w$]*)\s*(?::[^}]*)?\}")
 
@@ -225,6 +226,21 @@ def normalize_ownership_functions(raw) -> list[str]:
             seen.add(item)
             deduped.append(item)
     return deduped
+
+
+def scope_ownership_to_repo(encoded, repo_path: str | None) -> list[str]:
+    delimiter = OWNERSHIP_REPO_DELIM
+    repo_name = os.path.basename(os.path.normpath((repo_path or "").lower()))
+    out: list[str] = []
+    for entry in encoded or []:
+        parts = entry.split(delimiter)
+        name = parts[0]
+        repository = parts[1] if len(parts) >= 2 else ""
+        resource = parts[2] if len(parts) >= 3 else ""
+        if repository and repository.lower() != repo_name:
+            continue
+        out.append(f"{name}{delimiter}{delimiter}{resource}" if resource else name)
+    return out
 
 
 def find_ownership_annotation(

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Sink(BaseModel):
@@ -7,3 +7,4 @@ class Sink(BaseModel):
     line_number: int
     line_number_end: int | None = None
     code: str
+    metadata: dict[str, str] = Field(default_factory=dict)

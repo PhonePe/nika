@@ -66,7 +66,7 @@ class SecurityAgent:
         self._llm_config = config.llm_config
         self._max_tool_calls = config.llm_config.max_tool_calls
         self._max_iterations = config.llm_config.max_iterations
-        self._http_client = httpx.Client(verify=False)
+        self._http_client = httpx.Client(verify=self._llm_config.verify_tls)
         self._structured_client = self._create_structured_client()
 
         self.tools = [

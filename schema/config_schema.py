@@ -20,6 +20,7 @@ class LLMConfig(BaseModel):
         default=15.0,
         alias="COMPLETION_COST_PER_MILLION",
     )
+    verify_tls: bool = Field(default=True, alias="VERIFY_TLS")
 
 class SourceConfig(BaseModel):
     annotations: List[str]
