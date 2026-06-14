@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import Any
 
-from agents.security_agent import SecurityAgent, SecurityAgentRuntimeContext
 from schema.vulnerability_schema import LLMVulnerabilityOutput
 
 
@@ -40,8 +39,13 @@ def run_security_agent_review(
     context,
     evidence,
     *,
-    agent_factory=SecurityAgent,
+    agent_factory=None,
 ):
+    from agents.security_agent import SecurityAgent, SecurityAgentRuntimeContext
+
+    if agent_factory is None:
+        agent_factory = SecurityAgent
+
     system_prompt = vulnerability.build_system_prompt(evidence)
     human_prompt = vulnerability.build_human_prompt(evidence)
 
