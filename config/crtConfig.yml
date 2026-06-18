@@ -38,6 +38,8 @@ sources:
     - "@DeleteMapping"
     - "@PatchMapping"
     - "@Path"
+  source_methods:
+    - "com.example.web.LegacyServlet.handleRequest"
 
 vulnerabilityArgs:
   sensitive_logging:
@@ -60,8 +62,13 @@ vulnerabilityArgs:
     request_body_annotations: ["RequestBody"]
     ownership_check_functions:
       - { name: "checkUserOwnership", resource: "userId" }
-      - { name: "checkOrderOwnership", resource: "orderId" }
-    ownership_check_annotations: ["PreAuthorize", "PostAuthorize", "PreFilter", "PostFilter"]
+      - { name: "checkOrderOwnership", repository: "orders-service", resource: "orderId" }
+    ownership_check_annotations:
+      - "PreAuthorize"
+      - "PostAuthorize"
+      - "PreFilter"
+      - "PostFilter"
+      - { name: "OwnsResource", repository: "orders-service", resource: "orderId" }
     auto_detect_ownership: false
     principal_markers:
       - "SecurityContextHolder"
