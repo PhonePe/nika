@@ -2,25 +2,35 @@ rules:
   - id: java-thymeleaf-ssti-sink
     languages: [java]
     severity: ERROR
-    message: "Potential SSTI: Thymeleaf or SpEL processing a dynamic template string."
+    message: "Potential SSTI: Thymeleaf processing a dynamic template string."
     metadata:
       cwe: "CWE-94"
-      technology: [thymeleaf, spring, spel]
+      technology: [thymeleaf, spring]
     patterns:
-      # 1. Look for typed sinks for BOTH Thymeleaf and SpEL
-      - pattern-either:
-          # --- Thymeleaf Engine Sinks ---
-          - pattern: (TemplateEngine $ENGINE).process($INPUT, ...)
-          - pattern: (ITemplateEngine $ENGINE).process($INPUT, ...)
-          - pattern: (org.thymeleaf.TemplateEngine $ENGINE).process($INPUT, ...)
-          - pattern: (org.thymeleaf.ITemplateEngine $ENGINE).process($INPUT, ...)
-          
-          # --- Spring Expression Language (SpEL) Sinks ---
-          - pattern: (ExpressionParser $PARSER).parseExpression($INPUT).getValue(...)
-          - pattern: (SpelExpressionParser $PARSER).parseExpression($INPUT).getValue(...)
-          - pattern: (org.springframework.expression.ExpressionParser $PARSER).parseExpression($INPUT).getValue(...)
-          - pattern: (org.springframework.expression.spel.standard.SpelExpressionParser $PARSER).parseExpression($INPUT).getValue(...)
-
-      # 2. Filter out safe, hardcoded strings
+      - pattern: $ENGINE.process($INPUT, ...)
+      - metavariable-type:
+          metavariable: $ENGINE
+          types:
+            - TemplateEngine
+            - ITemplateEngine
+            - org.thymeleaf.TemplateEngine
+            - org.thymeleaf.ITemplateEngine
       - pattern-not: $ENGINE.process("...", ...)
-      - pattern-not: $PARSER.parseExpression("...").getValue(...)
+
+  - id: java-spel-ssti-sink
+    languages: [java]
+    severity: ERROR
+    message: "Potential SSTI: SpEL parsing a dynamic expression string."
+    metadata:
+      cwe: "CWE-94"
+      technology: [spring, spel]
+    patterns:
+      - pattern: $PARSER.parseExpression($INPUT)
+      - metavariable-type:
+          metavariable: $PARSER
+          types:
+            - ExpressionParser
+            - SpelExpressionParser
+            - org.springframework.expression.ExpressionParser
+            - org.springframework.expression.spel.standard.SpelExpressionParser
+      - pattern-not: $PARSER.parseExpression("...")
