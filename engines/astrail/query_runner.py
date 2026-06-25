@@ -45,24 +45,24 @@ class AstrailQueryRunner:
     @staticmethod
     def _write_params_file(params: dict) -> str:
         import base64
-
-        lines: list[str] = []
-        for key, value in params.items():
-            if isinstance(value, bool):
-                values = ["true" if value else "false"]
-            elif isinstance(value, (list, tuple, set)):
-                values = list(value)
-            else:
-                values = [value]
-            for item in values:
-                if item is None:
-                    continue
-                encoded = base64.b64encode(str(item).encode("utf-8")).decode("ascii")
-                lines.append(f"{key}\t{encoded}")
-
         fd, path = tempfile.mkstemp(suffix=".params")
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write("\n".join(lines))
+            first = True
+            for key, value in params.items():
+                if isinstance(value, bool):
+                    values = ["true" if value else "false"]
+                elif isinstance(value, (str, bytes)):
+                    values = [value]
+                elif hasattr(value, "__iter__"):
+                    values = value
+                else:
+                    values = [value]
+                for item in values:
+                    if item is None:
+                        continue
+                    encoded = base64.b64encode(str(item).encode("utf-8")).decode("ascii")
+                    handle.write(("" if first else "\n") + f"{key}\t{encoded}")
+                    first = False
         return path
 
     def _execute_query_sync(self, query: str, timeout: int = 300):
@@ -298,26 +298,32 @@ def execute_once = {{
         return result
 
     @staticmethod
-    def _encode_pairs(pairs) -> list[str]:
-        return [
-            f"{source.methodName}\t{sink.get('lineNumber', '')}\t{sink.get('file', '')}"
-            for source, sink in pairs
-        ]
+    def _encode_pairs(pairs):
+        for source, sink in pairs:
+            yield f"{source.methodName}\t{sink.get('lineNumber', '')}\t{sink.get('file', '')}"
+
+    @staticmethod
+    def _sanitizer_seq_literal(sanitizers) -> str:
+        return "Seq(" + ", ".join(_scala_literal(s) for s in (sanitizers or []) if s) + ")"
 
     def run_batch_reachability(self, pairs, sanitizers=None):
+        params_tmp = self._write_params_file({"pair": self._encode_pairs(pairs)})
+        if os.path.getsize(params_tmp) == 0:
+            os.remove(params_tmp)
             return []
 
         ping_result = self._execute_query_sync("1")
         if ping_result.get("success") is False:
+            os.remove(params_tmp)
             raise AstrailEngineError(
                 "Astrail server is not reachable for batch reachability."
             )
 
         query_file = self._query_file_path("batchReachabilityCheck.scala")
         if not os.path.exists(query_file):
+            os.remove(params_tmp)
             raise AstrailEngineError(f"Batch query file not found: {query_file}")
 
-        params_tmp = self._write_params_file({"pair": self._encode_pairs(pairs)})
         output_tmp = None
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as handle:
@@ -358,19 +364,23 @@ def execute_once = {{
                         pass
 
     def run_aggressive_reachability(self, pairs, sanitizers=None):
+        params_tmp = self._write_params_file({"pair": self._encode_pairs(pairs)})
+        if os.path.getsize(params_tmp) == 0:
+            os.remove(params_tmp)
             return []
 
         ping_result = self._execute_query_sync("1")
         if ping_result.get("success") is False:
+            os.remove(params_tmp)
             raise AstrailEngineError(
                 "Astrail server is not reachable for aggressive reachability."
             )
 
         query_file = self._query_file_path("aggressiveReachabilityCheck.scala")
         if not os.path.exists(query_file):
+            os.remove(params_tmp)
             raise AstrailEngineError(f"Aggressive query file not found: {query_file}")
 
-        params_tmp = self._write_params_file({"pair": self._encode_pairs(pairs)})
         output_tmp = None
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as handle:

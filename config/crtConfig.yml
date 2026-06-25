@@ -44,6 +44,16 @@ sources:
 vulnerabilityArgs:
   sensitive_logging:
     pii_keywords: ["private", "privateKey", "username", "password"]
+  sql_injection:
+    sanitizers: ["encodeForSQL", "escapeSql", "parseInt", "parseLong", "parseShort", "parseByte", "parseDouble", "parseFloat", "parseBoolean"]
+  command_injection:
+    sanitizers: ["encodeForOS", "parseInt", "parseLong", "parseShort", "parseByte", "parseDouble", "parseFloat", "parseBoolean"]
+  path_traversal:
+    sanitizers: ["parseInt", "parseLong", "parseShort", "parseByte", "parseDouble", "parseFloat", "parseBoolean"]
+  ldap_injection:
+    sanitizers: ["encodeForLDAP", "encodeForDN", "parseInt", "parseLong", "parseShort", "parseByte", "parseDouble", "parseFloat", "parseBoolean"]
+  xpath_injection:
+    sanitizers: ["encodeForXPath", "parseInt", "parseLong", "parseShort", "parseByte", "parseDouble", "parseFloat", "parseBoolean"]
   idor:
     identifier_params:
       - "userId"

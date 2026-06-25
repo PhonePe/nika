@@ -54,15 +54,18 @@ class AstrailEngine:
         raw_sources = self._get_query_runner().find_sources(source_definitions)
         return translate_sources(raw_sources)
 
-    def find_traces(self, context, sources, sinks):
-        pairs = [
+    def find_traces(self, context, sources, sinks, sanitizers=None):
+        if not sources or not sinks:
+            return translate_batch_reachability([])
+
+        pairs = (
             (
                 SimpleNamespace(methodName=source.symbol),
                 {"lineNumber": sink.line_number, "file": sink.file_path},
             )
             for sink in sinks
             for source in sources
-        ]
+        )
 
         config = ConfigProvider.get_config()
         if getattr(config, "aggressive_scan", False):
