@@ -4,27 +4,22 @@
 
 <div align="center">
 
-# Nika
+### Catch vulnerabilities that hide across files.
 
-### Open-Source Static Application Security Testing (SAST) tool with cross-file taint analysis
-
-<em>Trace attacker-controlled input from source to sink across your Java microservices.</em>
+<em>A free, open-source Java SAST that traces untrusted data from source to sink across files.</em>
 
 <br/>
 
-[![Join our Discord](https://img.shields.io/badge/Join_Discord-E8541E?style=for-the-badge&logo=discord&logoColor=FFFFFF&labelColor=0D0D0D)](https://discord.com/invite/PrTJ5Hubfm)
-&nbsp;
-[![Documentation](https://img.shields.io/badge/Read_The_Docs-E8541E?style=for-the-badge&logo=readthedocs&logoColor=FFFFFF&labelColor=0D0D0D)](https://phonepe.github.io/nika/)
+![License](https://img.shields.io/github/license/PhonePe/nika?style=for-the-badge&color=FFFFFF&labelColor=555555&logoColor=FFFFFF)
+![Stars](https://img.shields.io/github/stars/PhonePe/nika?style=for-the-badge&logo=github&logoColor=FFFFFF&color=FFFFFF&labelColor=555555)
+![Open issues](https://img.shields.io/github/issues/PhonePe/nika?style=for-the-badge&color=FFFFFF&labelColor=555555)
+![PRs welcome](https://img.shields.io/badge/PRs-welcome-FFFFFF?style=for-the-badge&labelColor=555555)
 
 <br/>
 
-![License](https://img.shields.io/github/license/PhonePe/nika?style=for-the-badge&color=E8541E&labelColor=0D0D0D&logoColor=FFFFFF)
+[![Join Discord](assets/join-discord.svg)](https://discord.com/invite/PrTJ5Hubfm)
 &nbsp;
-![Stars](https://img.shields.io/github/stars/PhonePe/nika?style=for-the-badge&logo=github&logoColor=FFFFFF&color=E8541E&labelColor=0D0D0D)
-&nbsp;
-![Open issues](https://img.shields.io/github/issues/PhonePe/nika?style=for-the-badge&color=E8541E&labelColor=0D0D0D)
-&nbsp;
-![PRs welcome](https://img.shields.io/badge/PRs-welcome-E8541E?style=for-the-badge&labelColor=0D0D0D)
+[![Read the Docs](assets/read-the-docs.svg)](https://phonepe.github.io/nika/)
 
 <br/>
 

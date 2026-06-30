@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="166" height="38" viewBox="0 0 242 56" role="img" aria-label="Read the Docs">
+  <rect x="1" y="1" width="240" height="54" rx="27" fill="#FFFFFF" stroke="#000000" stroke-opacity="0.08" stroke-width="2"/>
+
+  <!-- Book / docs icon (black) -->
+  <g transform="translate(26 17)" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 3 C2 1.9 2.9 1 4 1 H11 C11 1 11 22 11 22 H4 C2.9 22 2 21.1 2 20 Z"/>
+    <path d="M20 3 C20 1.9 19.1 1 18 1 H11 C11 1 11 22 11 22 H18 C19.1 22 20 21.1 20 20 Z"/>
+    <path d="M5 6 H8.5" />
+    <path d="M5 10 H8.5" />
+    <path d="M13.5 6 H17" />
+    <path d="M13.5 10 H17" />
+  </g>
+
+  <!-- Label -->
+  <text x="68" y="35" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#000000">Read the Docs</text>
+
+  <!-- Chevron -->
+  <path d="M220 21 l7 7 l-7 7" fill="none" stroke="#000000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
