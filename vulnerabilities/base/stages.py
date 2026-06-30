@@ -1,4 +1,5 @@
 import os
+import re
 
 from models.evidence import EvidenceBundle
 from models.finding import Finding
@@ -54,10 +55,45 @@ def discover_sources(vulnerability, context, state):
 
 def run_dataflow(vulnerability, context, state):
     logging.info("Running taint analysis for %s", vulnerability.vulnerability_id)
+    sanitizers = getattr(vulnerability, "sanitizers", None) or []
     state.traces = context.engines["dataflow_analyzer"].find_traces(
-        context, state.sources, state.sinks
+        context, state.sources, state.sinks, sanitizers=sanitizers
     )
     logging.info("Found %d vulnerabilities for %s", len(state.traces), vulnerability.vulnerability_id)
+    return state
+
+
+def resolve_dynamic_sinks(vulnerability, context, state):
+    candidate_ids = set(getattr(vulnerability, "dynamic_sink_rule_ids", ()) or ())
+    sinks = getattr(state, "sinks", None) or []
+    engine = context.engines.get("dataflow_analyzer") if hasattr(context, "engines") else None
+    if not candidate_ids or not sinks or engine is None or not hasattr(engine, "resolve_constant_args"):
+        return state
+
+    def _rule_id(sink):
+        return (getattr(sink, "rule_id", None) or "").split(".")[-1]
+
+    candidates = [s for s in sinks if _rule_id(s) in candidate_ids]
+    if not candidates:
+        return state
+    passthrough = [s for s in sinks if _rule_id(s) not in candidate_ids]
+
+    patterns = [re.compile(p) for p in (getattr(vulnerability, "weak_value_patterns", ()) or [])]
+    resolved = engine.resolve_constant_args(
+        context, [(s.file_path, s.line_number) for s in candidates]
+    )
+
+    kept = []
+    for sink in candidates:
+        values = resolved.get((sink.file_path, sink.line_number), [])
+        if values and any(p.search(v) for v in values for p in patterns):
+            kept.append(sink)
+
+    logging.info(
+        "Resolved %d dynamic sink(s) for %s; kept %d after constant resolution",
+        len(candidates), vulnerability.vulnerability_id, len(kept),
+    )
+    state.sinks = passthrough + kept
     return state
 
 

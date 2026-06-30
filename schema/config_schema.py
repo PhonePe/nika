@@ -24,6 +24,7 @@ class LLMConfig(BaseModel):
 
 class SourceConfig(BaseModel):
     annotations: List[str]
+    source_methods: List[str] = []
 
 class ConfigSchema(BaseModel):
     model_config = ConfigDict(populate_by_name=True)

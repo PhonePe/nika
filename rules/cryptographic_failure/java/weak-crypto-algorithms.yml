@@ -1,0 +1,46 @@
+rules:
+- id: weak-cipher-algorithm
+  patterns:
+  - pattern: $X.getInstance($ALGO, ...)
+  - metavariable-regex:
+      metavariable: $ALGO
+      regex: '(?i)^"(des|desede|3des|tripledes|rc2|rc4|arcfour|blowfish|idea|rc5)'
+  message: >-
+    Use of a weak/broken symmetric cipher algorithm. Prefer AES (GCM or CBC with a
+    random IV).
+  severity: ERROR
+  languages: [java]
+  metadata:
+    category: security
+    cwe: 'CWE-327: Use of a Broken or Risky Cryptographic Algorithm'
+    confidence: HIGH
+- id: ecb-cipher-mode
+  patterns:
+  - pattern: $X.getInstance($ALGO, ...)
+  - metavariable-regex:
+      metavariable: $ALGO
+      regex: '(?i)^"[^"]*/ecb/'
+  message: >-
+    Use of ECB cipher mode, which leaks plaintext patterns. Use an authenticated mode
+    such as GCM.
+  severity: ERROR
+  languages: [java]
+  metadata:
+    category: security
+    cwe: 'CWE-327: Use of a Broken or Risky Cryptographic Algorithm'
+    confidence: HIGH
+- id: weak-hash-algorithm
+  patterns:
+  - pattern: $X.getInstance($ALGO, ...)
+  - metavariable-regex:
+      metavariable: $ALGO
+      regex: '(?i)^"(md2|md4|md5|sha-?0|sha-?1|ripemd|haval)'
+  message: >-
+    Use of a weak/broken hash algorithm. Prefer SHA-256 or stronger for integrity, and a
+    salted KDF (bcrypt/scrypt/PBKDF2/Argon2) for passwords.
+  severity: ERROR
+  languages: [java]
+  metadata:
+    category: security
+    cwe: 'CWE-328: Use of Weak Hash'
+    confidence: HIGH

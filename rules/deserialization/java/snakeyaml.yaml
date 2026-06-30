@@ -1,0 +1,30 @@
+rules:
+  - id: snakeyaml-unsafe-load
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Unsafe SnakeYAML deserialization. Yaml.load()/loadAll()/loadAs() on attacker-controlled
+      input can instantiate arbitrary types and lead to RCE. Construct Yaml with a
+      SafeConstructor (or restrict allowed types) when parsing untrusted YAML.
+    metadata:
+      category: security
+      cwe: "CWE-502: Deserialization of Untrusted Data"
+      owasp:
+        - A8:2017 Insecure Deserialization
+        - A08:2021 Software and Data Integrity Failures
+      technology: [snakeyaml]
+      references:
+        - https://github.com/mbechler/marshalsec
+    patterns:
+      - pattern-either:
+          - pattern: $YAML.load($INPUT)
+          - pattern: $YAML.load($INPUT, ...)
+          - pattern: $YAML.loadAll($INPUT)
+          - pattern: $YAML.loadAs($INPUT, ...)
+      - metavariable-type:
+          metavariable: $YAML
+          types:
+            - Yaml
+            - org.yaml.snakeyaml.Yaml
+      - pattern-not: $YAML.load("...")
+      - pattern-not: $YAML.loadAs("...", ...)

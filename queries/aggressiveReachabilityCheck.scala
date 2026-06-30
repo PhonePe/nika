@@ -2,7 +2,33 @@ import scala.collection.mutable
 import io.shiftleft.codepropertygraph.generated.nodes.Method
 import java.util.regex.Pattern
 
-def esc(s: String): String = s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r")
+def loadParams(path: String): Map[String, Seq[String]] = {
+    val decoder = java.util.Base64.getDecoder
+    val source = scala.io.Source.fromFile(path)
+    try {
+        source.getLines().map(_.trim).filter(_.nonEmpty).toList.flatMap { line =>
+            val tab = line.indexOf('\t')
+            if (tab < 0) None
+            else Some((line.substring(0, tab), new String(decoder.decode(line.substring(tab + 1)), "UTF-8")))
+        }.groupBy(_._1).map { case (k, kvs) => (k, kvs.map(_._2)) }
+    } finally source.close()
+}
+
+def esc(s: String): String = {
+    val sb = new StringBuilder
+    s.foreach {
+        case '\\' => sb.append("\\\\")
+        case '"'  => sb.append("\\\"")
+        case '\n' => sb.append("\\n")
+        case '\r' => sb.append("\\r")
+        case '\t' => sb.append("\\t")
+        case '\b' => sb.append("\\b")
+        case '\f' => sb.append("\\f")
+        case c if c < 0x20 => sb.append("\\u%04x".format(c.toInt))
+        case c => sb.append(c)
+    }
+    sb.toString
+}
 
 def getMethodDefinition(m: Method): String = {
     def extractByLines(content: String, start: Int, end: Int): String =
@@ -131,9 +157,14 @@ def getMethodDefinition(m: Method): String = {
 
 // Aggressive reachability: call-graph-only (no taint tracking)
 
-def findAggressivePathsBatch(inputPath: String, outputPath: String): Unit = {
-    val lines = scala.io.Source.fromFile(inputPath).getLines().toArray
+def findAggressivePathsBatch(paramsPath: String, outputPath: String, sanitizers: Seq[String] = Seq.empty): Unit = {
+    val lines = loadParams(paramsPath).getOrElse("pair", Seq.empty).toArray
     println(s"[aggressive-batch] Processing ${lines.length} pairs")
+
+    val sanitizerSet = sanitizers.toSet
+    def chainSanitized(chain: Seq[Method]): Boolean =
+        sanitizers.nonEmpty && chain.exists(m =>
+            sanitizerSet.contains(m.name) || sanitizers.exists(s => m.fullName.contains(s)))
 
     val sourceCache = mutable.Map[String, Option[Method]]()
     val allResults = mutable.ArrayBuffer[String]()
@@ -172,7 +203,7 @@ def findAggressivePathsBatch(inputPath: String, outputPath: String): Unit = {
 
                         val chains = sinkTrav.reachableByCallGraphWithChain(sourceTrav)
 
-                        for (chain <- chains if chain.nonEmpty) {
+                        for (chain <- chains if chain.nonEmpty && !chainSanitized(chain)) {
                             val pathEntries = mutable.ArrayBuffer[String]()
 
                             chain.zipWithIndex.foreach { case (m, idx) =>

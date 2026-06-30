@@ -1,0 +1,16 @@
+rules:
+- id: crypto-getinstance-dynamic-algo
+  patterns:
+  - pattern: $X.getInstance($V)
+  - metavariable-regex:
+      metavariable: $V
+      regex: '^[^"]'
+  message: >-
+    getInstance called with a dynamic algorithm; resolved to a weak constant via CPG
+    analysis.
+  severity: ERROR
+  languages: [java]
+  metadata:
+    category: security
+    cwe: 'CWE-327: Use of a Broken or Risky Cryptographic Algorithm'
+    confidence: LOW

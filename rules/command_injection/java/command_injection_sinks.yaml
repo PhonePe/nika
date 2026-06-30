@@ -1,0 +1,38 @@
+rules:
+- id: cmdi-runtime-exec-sink
+  patterns:
+    - pattern: $RT.exec($CMD, ...)
+    - metavariable-type:
+        metavariable: $RT
+        types:
+          - java.lang.Runtime
+          - Runtime
+    - pattern-inside: "$METHOD(...) {\n  ...\n}"
+    - pattern-inside: "class $CLASS {\n  ...\n}"
+  message: 'Class: $CLASS, Method: $METHOD'
+  severity: ERROR
+  languages: [java]
+  metadata:
+    category: security
+    cwe: 'CWE-78: OS Command Injection'
+    confidence: MEDIUM
+
+- id: cmdi-processbuilder-sink
+  patterns:
+    - pattern-either:
+        - pattern: new ProcessBuilder($CMD, ...)
+        - pattern: $PB.command($CMD, ...)
+    - metavariable-type:
+        metavariable: $PB
+        types:
+          - java.lang.ProcessBuilder
+          - ProcessBuilder
+    - pattern-inside: "$METHOD(...) {\n  ...\n}"
+    - pattern-inside: "class $CLASS {\n  ...\n}"
+  message: 'Class: $CLASS, Method: $METHOD'
+  severity: ERROR
+  languages: [java]
+  metadata:
+    category: security
+    cwe: 'CWE-78: OS Command Injection'
+    confidence: MEDIUM

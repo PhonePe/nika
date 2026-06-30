@@ -7,14 +7,11 @@ rules:
       cwe: "CWE-94"
       technology: [pebble]
     patterns:
-      # 1. Restrict $ENGINE to only PebbleEngine types (including legacy and modern package names)
-      - pattern-either:
-          - pattern: (PebbleEngine $ENGINE).getTemplate(...)
-          - pattern: (io.pebbletemplates.pebble.PebbleEngine $ENGINE).getTemplate(...)
-          - pattern: (com.mitchellbosecke.pebble.PebbleEngine $ENGINE).getTemplate(...)
-
-      # 2. Look for the dangerous dynamic input sink
       - pattern: $ENGINE.getTemplate($INPUT)
-
-      # 3. Filter out safe, hardcoded strings
+      - metavariable-type:
+          metavariable: $ENGINE
+          types:
+            - PebbleEngine
+            - io.pebbletemplates.pebble.PebbleEngine
+            - com.mitchellbosecke.pebble.PebbleEngine
       - pattern-not: $ENGINE.getTemplate("...")

@@ -1,0 +1,19 @@
+rules:
+  - id: commons-lang-deserialize
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Unsafe deserialization via Apache Commons Lang SerializationUtils.deserialize(). It
+      delegates to ObjectInputStream and will instantiate any serializable class on the
+      classpath; deserializing attacker-controlled bytes can lead to RCE.
+    metadata:
+      category: security
+      cwe: "CWE-502: Deserialization of Untrusted Data"
+      owasp:
+        - A8:2017 Insecure Deserialization
+        - A08:2021 Software and Data Integrity Failures
+      technology: [apache-commons-lang]
+    pattern-either:
+      - pattern: org.apache.commons.lang3.SerializationUtils.deserialize(...)
+      - pattern: org.apache.commons.lang.SerializationUtils.deserialize(...)
+      - pattern: SerializationUtils.deserialize(...)

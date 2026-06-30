@@ -1,0 +1,58 @@
+rules:
+- id: jdbc-statement-exec-sink
+  patterns:
+  - pattern-either:
+    - pattern: $STMT.executeQuery($SQL, ...)
+    - pattern: $STMT.executeUpdate($SQL, ...)
+    - pattern: $STMT.executeLargeUpdate($SQL, ...)
+    - pattern: $STMT.execute($SQL, ...)
+    - pattern: $STMT.addBatch($SQL, ...)
+  - pattern-not: $STMT.$M("...", ...)
+  - pattern-not: $STMT.$M("...")
+  - pattern-inside: "$METHOD(...) {\n  ...\n}"
+  - pattern-inside: "class $CLASS {\n  ...\n}"
+  message: 'Class: $CLASS, Method: $METHOD'
+  severity: ERROR
+  languages: [java]
+  metadata:
+    category: security
+    cwe: 'CWE-89: SQL Injection'
+    confidence: MEDIUM
+- id: jdbc-connection-prepare-sink
+  patterns:
+  - pattern-either:
+    - pattern: $CONN.prepareStatement($SQL, ...)
+    - pattern: $CONN.prepareCall($SQL, ...)
+  - pattern-not: $CONN.$M("...", ...)
+  - pattern-not: $CONN.$M("...")
+  - pattern-inside: "$METHOD(...) {\n  ...\n}"
+  - pattern-inside: "class $CLASS {\n  ...\n}"
+  message: 'Class: $CLASS, Method: $METHOD'
+  severity: ERROR
+  languages: [java]
+  metadata:
+    category: security
+    cwe: 'CWE-89: SQL Injection'
+    confidence: MEDIUM
+- id: spring-jdbctemplate-sink
+  patterns:
+  - pattern-either:
+    - pattern: $TEMPLATE.queryForObject($SQL, ...)
+    - pattern: $TEMPLATE.queryForList($SQL, ...)
+    - pattern: $TEMPLATE.queryForMap($SQL, ...)
+    - pattern: $TEMPLATE.queryForRowSet($SQL, ...)
+    - pattern: $TEMPLATE.query($SQL, ...)
+    - pattern: $TEMPLATE.update($SQL, ...)
+    - pattern: $TEMPLATE.execute($SQL, ...)
+    - pattern: $TEMPLATE.batchUpdate($SQL, ...)
+  - pattern-not: $TEMPLATE.$M("...", ...)
+  - pattern-not: $TEMPLATE.$M("...")
+  - pattern-inside: "$METHOD(...) {\n  ...\n}"
+  - pattern-inside: "class $CLASS {\n  ...\n}"
+  message: 'Class: $CLASS, Method: $METHOD'
+  severity: ERROR
+  languages: [java]
+  metadata:
+    category: security
+    cwe: 'CWE-89: SQL Injection'
+    confidence: MEDIUM

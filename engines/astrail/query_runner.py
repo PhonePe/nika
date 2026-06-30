@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import tempfile
-
+import itertools
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -45,24 +45,24 @@ class AstrailQueryRunner:
     @staticmethod
     def _write_params_file(params: dict) -> str:
         import base64
-
-        lines: list[str] = []
-        for key, value in params.items():
-            if isinstance(value, bool):
-                values = ["true" if value else "false"]
-            elif isinstance(value, (list, tuple, set)):
-                values = list(value)
-            else:
-                values = [value]
-            for item in values:
-                if item is None:
-                    continue
-                encoded = base64.b64encode(str(item).encode("utf-8")).decode("ascii")
-                lines.append(f"{key}\t{encoded}")
-
         fd, path = tempfile.mkstemp(suffix=".params")
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write("\n".join(lines))
+            first = True
+            for key, value in params.items():
+                if isinstance(value, bool):
+                    values = ["true" if value else "false"]
+                elif isinstance(value, (str, bytes)):
+                    values = [value]
+                elif hasattr(value, "__iter__"):
+                    values = value
+                else:
+                    values = [value]
+                for item in values:
+                    if item is None:
+                        continue
+                    encoded = base64.b64encode(str(item).encode("utf-8")).decode("ascii")
+                    handle.write(("" if first else "\n") + f"{key}\t{encoded}")
+                    first = False
         return path
 
     def _execute_query_sync(self, query: str, timeout: int = 300):
@@ -258,18 +258,34 @@ def execute_once = {{
             source_definitions["default"] = list(_get_config().sources.annotations)
 
         annotations = []
+        servlet_methods = []
         for tokens in source_definitions.values():
             for token in tokens:
-                if token and token not in annotations:
-                    annotations.append(token)
+                if not token:
+                    continue
+                if token.startswith("@"):
+                    name = token[1:]
+                    if name not in annotations:
+                        annotations.append(name)
+                elif token not in servlet_methods:
+                    servlet_methods.append(token)
 
         annotations_list_str = ", ".join(
-            _scala_literal(annotation[1:] if annotation.startswith("@") else annotation)
-            for annotation in annotations
+            _scala_literal(annotation) for annotation in annotations
+        )
+        servlet_list_str = ", ".join(
+            _scala_literal(name) for name in servlet_methods
+        )
+        source_method_fqns = list(_get_config().sources.source_methods or [])
+        source_method_list_str = ", ".join(
+            _scala_literal(name) for name in source_method_fqns if name
         )
         result = self._execute_scala_query(
             self._query_file_path("getApiPath.scala"),
-            f"getAPIData(Set({annotations_list_str}))",
+            "getAPIData("
+            f"Set({annotations_list_str}), "
+            f"Set({servlet_list_str}), "
+            f"Set({source_method_list_str}))",
         )
 
         if isinstance(result, str):
@@ -281,39 +297,66 @@ def execute_once = {{
                 ) from exc
         return result
 
-    def run_batch_reachability(self, pairs):
-        if not pairs:
+    @staticmethod
+    def _encode_pairs(pairs):
+        for source, sink in pairs:
+            yield f"{source.methodName}\t{sink.get('lineNumber', '')}\t{sink.get('file', '')}"
+
+    @staticmethod
+    def _sanitizer_seq_literal(sanitizers) -> str:
+        return "Seq(" + ", ".join(_scala_literal(s) for s in (sanitizers or []) if s) + ")"
+
+    def run_batch_reachability(self, pairs, sanitizers=None):
+        CHUNK_SIZE = self._get_astrail_config().get("chunk_size", 100_000)
+        iterator_pairs = iter(pairs)
+        chunks = list(itertools.islice(iterator_pairs, CHUNK_SIZE))
+        if not chunks:
+            return []
+        results = []
+        processed_pairs = 0
+        try:
+            while chunks:
+                processed_pairs += len(chunks)
+                logging.info("Processing batch reachability chunk with %d pairs processed so far", processed_pairs)
+                chunk_results = self.run_batch_reachability_chunk(chunks, sanitizers)
+                results.extend(chunk_results)
+                chunks = list(itertools.islice(iterator_pairs, CHUNK_SIZE))
+        except Exception as exc:
+            raise AstrailEngineError(f"Error in batch reachability: {exc}") from exc
+        return results 
+
+    def run_batch_reachability_chunk(self, pairs, sanitizers=None):
+        params_tmp = self._write_params_file({"pair": self._encode_pairs(pairs)})
+        if os.path.getsize(params_tmp) == 0:
+            os.remove(params_tmp)
             return []
 
         ping_result = self._execute_query_sync("1")
         if ping_result.get("success") is False:
+            os.remove(params_tmp)
             raise AstrailEngineError(
                 "Astrail server is not reachable for batch reachability."
             )
 
         query_file = self._query_file_path("batchReachabilityCheck.scala")
         if not os.path.exists(query_file):
+            os.remove(params_tmp)
             raise AstrailEngineError(f"Batch query file not found: {query_file}")
 
-        input_tmp = None
         output_tmp = None
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".tsv", mode="w") as handle:
-                input_tmp = handle.name
-                for source, sink in pairs:
-                    line_num = sink.get("lineNumber", "")
-                    file_name = sink.get("file", "")
-                    handle.write(f"{source.methodName}\t{line_num}\t{file_name}\n")
-
             with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as handle:
                 output_tmp = handle.name
 
             with open(query_file, "r", encoding="utf-8") as handle:
                 query_content = handle.read()
 
-            input_escaped = input_tmp.replace("\\", "\\\\")
+            params_escaped = params_tmp.replace("\\", "\\\\")
             output_escaped = output_tmp.replace("\\", "\\\\")
-            script = query_content + f'\nfindPathsBatch("{input_escaped}", "{output_escaped}")'
+            sanitizer_seq = self._sanitizer_seq_literal(sanitizers)
+            script = query_content + (
+                f'\nfindPathsBatch("{params_escaped}", "{output_escaped}", {sanitizer_seq})'
+            )
             result = self._execute_query_sync(script, timeout=3600)
 
             if result.get("success") is False:
@@ -326,53 +369,51 @@ def execute_once = {{
                     data = handle.read()
                 if data:
                     return json.loads(data)
-
             return []
         except AstrailEngineError:
             raise
         except Exception as exc:
             raise AstrailEngineError(f"Error in batch reachability: {exc}") from exc
         finally:
-            for tmp in [input_tmp, output_tmp]:
+            for tmp in [params_tmp, output_tmp]:
                 if tmp and os.path.exists(tmp):
                     try:
                         os.remove(tmp)
                     except OSError:
                         pass
 
-    def run_aggressive_reachability(self, pairs):
-        if not pairs:
+    def run_aggressive_reachability(self, pairs, sanitizers=None):
+        params_tmp = self._write_params_file({"pair": self._encode_pairs(pairs)})
+        if os.path.getsize(params_tmp) == 0:
+            os.remove(params_tmp)
             return []
 
         ping_result = self._execute_query_sync("1")
         if ping_result.get("success") is False:
+            os.remove(params_tmp)
             raise AstrailEngineError(
                 "Astrail server is not reachable for aggressive reachability."
             )
 
         query_file = self._query_file_path("aggressiveReachabilityCheck.scala")
         if not os.path.exists(query_file):
+            os.remove(params_tmp)
             raise AstrailEngineError(f"Aggressive query file not found: {query_file}")
 
-        input_tmp = None
         output_tmp = None
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".tsv", mode="w") as handle:
-                input_tmp = handle.name
-                for source, sink in pairs:
-                    line_num = sink.get("lineNumber", "")
-                    file_name = sink.get("file", "")
-                    handle.write(f"{source.methodName}\t{line_num}\t{file_name}\n")
-
             with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as handle:
                 output_tmp = handle.name
 
             with open(query_file, "r", encoding="utf-8") as handle:
                 query_content = handle.read()
 
-            input_escaped = input_tmp.replace("\\", "\\\\")
+            params_escaped = params_tmp.replace("\\", "\\\\")
             output_escaped = output_tmp.replace("\\", "\\\\")
-            script = query_content + f'\nfindAggressivePathsBatch("{input_escaped}", "{output_escaped}")'
+            sanitizer_seq = self._sanitizer_seq_literal(sanitizers)
+            script = query_content + (
+                f'\nfindAggressivePathsBatch("{params_escaped}", "{output_escaped}", {sanitizer_seq})'
+            )
             result = self._execute_query_sync(script, timeout=3600)
 
             if result.get("success") is False:
@@ -392,7 +433,61 @@ def execute_once = {{
         except Exception as exc:
             raise AstrailEngineError(f"Error in aggressive reachability: {exc}") from exc
         finally:
-            for tmp in [input_tmp, output_tmp]:
+            for tmp in [params_tmp, output_tmp]:
+                if tmp and os.path.exists(tmp):
+                    try:
+                        os.remove(tmp)
+                    except OSError:
+                        pass
+
+    def run_const_arg_resolution(self, locations):
+        if not locations:
+            return []
+
+        ping_result = self._execute_query_sync("1")
+        if ping_result.get("success") is False:
+            raise AstrailEngineError(
+                "Astrail server is not reachable for constant-argument resolution."
+            )
+
+        query_file = self._query_file_path("resolveConstArg.scala")
+        if not os.path.exists(query_file):
+            raise AstrailEngineError(f"Resolver query file not found: {query_file}")
+
+        params_tmp = self._write_params_file(
+            {"location": [f"{file_path}\t{line_number}" for file_path, line_number in locations]}
+        )
+        output_tmp = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as handle:
+                output_tmp = handle.name
+
+            with open(query_file, "r", encoding="utf-8") as handle:
+                query_content = handle.read()
+
+            params_escaped = params_tmp.replace("\\", "\\\\")
+            output_escaped = output_tmp.replace("\\", "\\\\")
+            script = query_content + (
+                f'\nresolveBatch("{params_escaped}", "{output_escaped}")'
+            )
+            result = self._execute_query_sync(script, timeout=1800)
+            if result.get("success") is False:
+                raise AstrailEngineError(
+                    f"Constant-argument resolution failed: {result.get('error', 'unknown')}"
+                )
+
+            if output_tmp and os.path.exists(output_tmp):
+                with open(output_tmp, "r", encoding="utf-8") as handle:
+                    data = handle.read()
+                if data:
+                    return json.loads(data)
+            return []
+        except AstrailEngineError:
+            raise
+        except Exception as exc:
+            raise AstrailEngineError(f"Error in constant-argument resolution: {exc}") from exc
+        finally:
+            for tmp in [params_tmp, output_tmp]:
                 if tmp and os.path.exists(tmp):
                     try:
                         os.remove(tmp)

@@ -1,0 +1,45 @@
+rules:
+  - id: tainted-file-path-nio
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Path traversal: a file/path is opened from a potentially attacker-controlled value.
+    metadata:
+      category: security
+      cwe: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')"
+      technology: [java, nio]
+    pattern-either:
+      - pattern: java.nio.file.Files.newInputStream(...)
+      - pattern: Files.newInputStream(...)
+      - pattern: java.nio.file.Files.newOutputStream(...)
+      - pattern: Files.newOutputStream(...)
+      - pattern: java.nio.file.Files.newBufferedReader(...)
+      - pattern: Files.newBufferedReader(...)
+      - pattern: java.nio.file.Files.newBufferedWriter(...)
+      - pattern: Files.newBufferedWriter(...)
+      - pattern: java.nio.file.Files.readAllBytes(...)
+      - pattern: Files.readAllBytes(...)
+      - pattern: java.nio.file.Files.readAllLines(...)
+      - pattern: Files.readAllLines(...)
+      - pattern: java.nio.file.Files.readString(...)
+      - pattern: Files.readString(...)
+      - pattern: java.nio.file.Files.lines(...)
+      - pattern: Files.lines(...)
+      - pattern: java.nio.file.Files.write(...)
+      - pattern: Files.write(...)
+      - pattern: java.nio.file.Files.writeString(...)
+      - pattern: Files.writeString(...)
+      - pattern: java.nio.file.Files.copy(...)
+      - pattern: Files.copy(...)
+      - pattern: java.nio.file.Files.move(...)
+      - pattern: Files.move(...)
+      - pattern: java.nio.file.Path.of(...)
+      - pattern: Path.of(...)
+      - pattern: new RandomAccessFile(...)
+      - pattern: new java.io.RandomAccessFile(...)
+      - pattern: new FileWriter(...)
+      - pattern: new java.io.FileWriter(...)
+      - pattern: new org.springframework.core.io.FileSystemResource(...)
+      - pattern: org.apache.commons.io.FileUtils.readFileToString(...)
+      - pattern: org.apache.commons.io.FileUtils.readLines(...)
+      - pattern: org.apache.commons.io.FileUtils.openInputStream(...)

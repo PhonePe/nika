@@ -23,6 +23,13 @@ JAVA_SOURCE_DEFINITIONS = {
         "@DgsMutation",
         "@DgsSubscription",
         "@DgsData",
+        # Servlet methods
+        "doGet",
+        "doPost",
+        "doPut",
+        "doDelete",
+        "doHead",
+        "doOptions"
     ],
     "message_payload": [
         "@KafkaListener",

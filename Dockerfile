@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /opt
 
 # Install Astrail
-RUN curl -L "https://github.com/rootaux/astrail/releases/download/v0.0.3/astrail-cli.zip" -o astrail-cli.zip && unzip astrail-cli.zip -d /opt && rm astrail-cli.zip
+RUN curl -L "https://github.com/rootaux/astrail/releases/download/v0.0.5/astrail-cli.zip" -o astrail-cli.zip && unzip astrail-cli.zip -d /opt && rm astrail-cli.zip
 
 # Install Opengrep
 ARG OPENGREP_URL

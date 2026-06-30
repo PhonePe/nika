@@ -14,7 +14,7 @@ VENV_DIR="${NIKA_VENV_DIR:-${SCRIPT_DIR}/.venv}"
 CONFIG_TEMPLATE="${SCRIPT_DIR}/config/crtConfig.yml"
 NATIVE_CONFIG_PATH="${NIKA_NATIVE_CONFIG:-${SCRIPT_DIR}/config/native-crtConfig.yml}"
 
-ASTRAIL_URL="${ASTRAIL_URL:-https://github.com/rootaux/astrail/releases/download/v0.0.3/astrail-cli.zip}"
+ASTRAIL_URL="${ASTRAIL_URL:-https://github.com/rootaux/astrail/releases/download/v0.0.5/astrail-cli.zip}"
 OPENGREP_VERSION="${OPENGREP_VERSION:-v1.19.0}"
 ASSUME_YES="${NIKA_ASSUME_YES:-0}"
 

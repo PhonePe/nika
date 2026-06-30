@@ -1,0 +1,54 @@
+rules:
+  - id: unsafe-reflection-method-select
+    languages: [java]
+    severity: WARNING
+    message: >-
+      Unsafe reflection: a method/field is selected by a potentially attacker-controlled name.
+      Controlling which method is reflected can let an attacker invoke unintended code.
+      Validate the name against an allow-list.
+    metadata:
+      category: security
+      cwe: "CWE-470: Use of Externally-Controlled Input to Select Classes or Code ('Unsafe Reflection')"
+      technology: [java]
+    patterns:
+      - pattern-either:
+          - pattern: $CLASS.getMethod($INPUT, ...)
+          - pattern: $CLASS.getDeclaredMethod($INPUT, ...)
+          - pattern: $CLASS.getField($INPUT)
+          - pattern: $CLASS.getDeclaredField($INPUT)
+      - pattern-not: $CLASS.getMethod("...", ...)
+      - pattern-not: $CLASS.getDeclaredMethod("...", ...)
+      - pattern-not: $CLASS.getField("...")
+      - pattern-not: $CLASS.getDeclaredField("...")
+
+  - id: unsafe-reflection-method-invoke
+    languages: [java]
+    severity: WARNING
+    message: >-
+      Unsafe reflection: java.lang.reflect.Method.invoke() reached by attacker-controlled data.
+      If the invoked method or its arguments are attacker-influenced this can lead to
+      unintended code execution.
+    metadata:
+      category: security
+      cwe: "CWE-470: Use of Externally-Controlled Input to Select Classes or Code ('Unsafe Reflection')"
+      technology: [java]
+    patterns:
+      - pattern: $M.invoke(...)
+      - metavariable-type:
+          metavariable: $M
+          types:
+            - Method
+            - java.lang.reflect.Method
+
+  - id: unsafe-reflection-constructor-newinstance
+    languages: [java]
+    severity: WARNING
+    message: >-
+      Unsafe reflection: java.lang.reflect.Constructor.newInstance() reached by
+      attacker-controlled data, instantiating a reflectively-selected class.
+    metadata:
+      category: security
+      cwe: "CWE-470: Use of Externally-Controlled Input to Select Classes or Code ('Unsafe Reflection')"
+      technology: [java]
+    patterns:
+      - pattern: $CTOR.newInstance($ARG, ...)

@@ -7,19 +7,20 @@ rules:
       cwe: "CWE-94"
       technology: [mustache]
     patterns:
-      # 1. Restrict $FACTORY to only MustacheFactory types
-      - pattern-either:
-          - pattern: (MustacheFactory $FACTORY).compile(...)
-          - pattern: (com.github.mustachejava.MustacheFactory $FACTORY).compile(...)
-          - pattern: (DefaultMustacheFactory $FACTORY).compile(...)
-          - pattern: (com.github.mustachejava.DefaultMustacheFactory $FACTORY).compile(...)
-      
-      # 2. Look for the dangerous dynamic input sinks
       - pattern-either:
           - pattern: $FACTORY.compile(new StringReader($INPUT), ...)
+          - pattern: $FACTORY.compile(new java.io.StringReader($INPUT), ...)
           - pattern: $FACTORY.compile($INPUT)
-          - pattern: $FACTORY.compile($INPUT, ...) # Added to catch compile(String name, String template) overrides
-      
-      # 3. Filter out safe, hardcoded strings
+          - pattern: $FACTORY.compile($INPUT, ...)
+      - metavariable-type:
+          metavariable: $FACTORY
+          types:
+            - MustacheFactory
+            - com.github.mustachejava.MustacheFactory
+            - DefaultMustacheFactory
+            - com.github.mustachejava.DefaultMustacheFactory
+      # Filter out safe, hardcoded templates
       - pattern-not: $FACTORY.compile("...", ...)
+      - pattern-not: $FACTORY.compile("...")
       - pattern-not: $FACTORY.compile(new StringReader("..."), ...)
+      - pattern-not: $FACTORY.compile(new java.io.StringReader("..."), ...)

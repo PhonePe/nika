@@ -2,6 +2,7 @@ from vulnerabilities.base.base_vulnerability import BaseVulnerability
 from vulnerabilities.base.stages import (
     finalize_sink_findings,
     match_rule_sinks,
+    resolve_dynamic_sinks,
     review_sinks_with_llm,
 )
 
@@ -15,10 +16,16 @@ class InsecureCryptoVulnerability(BaseVulnerability):
         "algorithms, insecure random generation, or hardcoded secrets."
     )
     supported_languages = ["java"]
-    required_engine_roles = ["sink_finder"]
+    required_engine_roles = ["sink_finder", "dataflow_analyzer"]
     source_types = []
     prompt_kind = "sink"
-    stages = [match_rule_sinks, finalize_sink_findings]
+    stages = [match_rule_sinks, resolve_dynamic_sinks, finalize_sink_findings]
+    dynamic_sink_rule_ids = ["crypto-getinstance-dynamic-algo"]
+    weak_value_patterns = [
+        r'(?i)"(des|desede|3des|tripledes|rc2|rc4|arcfour|blowfish|idea|rc5)',
+        r'(?i)"[^"]*/ecb/',
+        r'(?i)"(md2|md4|md5|sha-?0|sha-?1|ripemd|haval)',
+    ]
     review_mode = "optional"
     system_prompt = (
         "Review this Java cryptography snippet for insecure crypto usage. Mark "

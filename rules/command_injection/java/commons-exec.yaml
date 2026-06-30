@@ -1,0 +1,25 @@
+rules:
+  - id: commons-exec-command-injection
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Potential OS command injection via Apache Commons Exec. Building a CommandLine from a
+      dynamic string (CommandLine.parse) or appending unescaped arguments lets an attacker
+      inject commands/arguments. Build the CommandLine with a fixed executable and add
+      validated arguments.
+    metadata:
+      category: security
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')"
+      technology: [apache-commons-exec]
+    patterns:
+      - pattern-either:
+          - pattern: org.apache.commons.exec.CommandLine.parse($INPUT)
+          - pattern: org.apache.commons.exec.CommandLine.parse($INPUT, ...)
+          - pattern: CommandLine.parse($INPUT)
+          - pattern: CommandLine.parse($INPUT, ...)
+          - pattern: $CL.addArguments($INPUT, ...)
+          - pattern: $CL.addArgument($INPUT, ...)
+      - pattern-not: CommandLine.parse("...")
+      - pattern-not: org.apache.commons.exec.CommandLine.parse("...")
+      - pattern-not: $CL.addArgument("...", ...)
+      - pattern-not: $CL.addArguments("...", ...)

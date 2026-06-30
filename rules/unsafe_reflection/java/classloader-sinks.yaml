@@ -1,0 +1,25 @@
+rules:
+  - id: unsafe-reflection-loadclass
+    languages: [java]
+    severity: WARNING
+    message: >-
+      Unsafe reflection: a class is loaded from a potentially attacker-controlled name. If an
+      attacker controls the class name, they may instantiate unexpected classes. Validate
+      against an allow-list before loading.
+    metadata:
+      category: security
+      cwe: "CWE-470: Use of Externally-Controlled Input to Select Classes or Code ('Unsafe Reflection')"
+      technology: [java]
+    patterns:
+      - pattern-either:
+          - pattern: $CL.loadClass($INPUT)
+          - pattern: $CL.loadClass($INPUT, ...)
+      - metavariable-type:
+          metavariable: $CL
+          types:
+            - ClassLoader
+            - java.lang.ClassLoader
+            - URLClassLoader
+            - java.net.URLClassLoader
+      - pattern-not: $CL.loadClass("...")
+      - pattern-not: $CL.loadClass("...", ...)
