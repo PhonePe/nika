@@ -63,8 +63,12 @@ def getAPIData(sourceAnnotations: Set[String], servletMethods: Set[String], sour
 
     // Arbitrary user-configured sources
     if (sourceMethodFullNames.nonEmpty) {
-        val sourceMethodNames = sourceMethodFullNames.toSeq
-        cpg.method.fullNameExact(sourceMethodNames*).foreach { m =>
+        def quoteRegex(s: String): String = java.util.regex.Pattern.quote(s)
+        val sourceMethodPatterns = sourceMethodFullNames.toSeq.map { name =>
+            if (name.contains(":")) quoteRegex(name)
+            else quoteRegex(name) + ":.*"
+        }
+        cpg.method.fullName(sourceMethodPatterns*).foreach { m =>
             val classASTNode = Iterator(m).repeat(_.astParent)(_.until(_.isTypeDecl)).headOption
             val classFullName = classASTNode.map(_.asInstanceOf[TypeDecl].fullName).getOrElse("")
 
