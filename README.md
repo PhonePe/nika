@@ -10,8 +10,8 @@
 
 <br/>
 
-![License](https://img.shields.io/github/license/PhonePe/nika?style=for-the-badge&color=FFFFFF&labelColor=555555&logoColor=FFFFFF)
-![Stars](https://img.shields.io/github/stars/PhonePe/nika?style=for-the-badge&logo=github&logoColor=FFFFFF&color=FFFFFF&labelColor=555555)
+[![License](https://img.shields.io/badge/License-Apache%202.0-FFFFFF?style=for-the-badge&labelColor=555555)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/PhonePe/nika?style=for-the-badge&logo=github&logoColor=FFFFFF&color=FFFFFF&labelColor=555555&cacheSeconds=300)](https://github.com/PhonePe/nika/stargazers)
 ![Open issues](https://img.shields.io/github/issues/PhonePe/nika?style=for-the-badge&color=FFFFFF&labelColor=555555)
 ![PRs welcome](https://img.shields.io/badge/PRs-welcome-FFFFFF?style=for-the-badge&labelColor=555555)
 
