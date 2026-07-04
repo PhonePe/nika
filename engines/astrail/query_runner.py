@@ -650,18 +650,13 @@ def execute_once = {{
                     except OSError:
                         pass
 
-    @staticmethod
-    def _encode_open_redirect_pairs(pairs):
-        for source, sink in pairs:
-            yield f"{source.methodName}\t{sink.get('lineNumber', '')}\t{sink.get('file', '')}"
-
     def run_open_redirect_flow_analysis(
         self,
         pairs,
         source_annotations=None,
         request_accessors=None,
     ):
-        pair_values = list(self._encode_open_redirect_pairs(pairs))
+        pair_values = list(self._encode_pairs(pairs))
         if not pair_values:
             return []
 
