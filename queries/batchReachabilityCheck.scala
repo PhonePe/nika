@@ -155,13 +155,43 @@ def getMethodDefinition(m: Method): String = {
     }
 }
 
-def findPathsBatch(paramsPath: String, outputPath: String, sanitizers: Seq[String] = Seq.empty): Unit = {
+def findPathsBatch(
+    paramsPath: String,
+    outputPath: String,
+    sanitizers: Seq[String] = Seq.empty,
+    excludeArgAnnotations: Seq[String] = Seq.empty,
+    excludeArgTypes: Seq[String] = Seq.empty
+): Unit = {
     val lines = loadParams(paramsPath).getOrElse("pair", Seq.empty).toArray
     println(s"[batch] Processing ${lines.length} pairs" + (if (sanitizers.nonEmpty) s" (sanitizers: ${sanitizers.mkString(",")})" else ""))
 
     val sanitizerSet = sanitizers.toSet
     def isSanitizerCall(c: Call): Boolean =
         sanitizerSet.contains(c.name) || sanitizers.exists(s => c.methodFullName.contains(s))
+
+    val excludeAnnoSet = excludeArgAnnotations
+        .map(a => if (a.startsWith("@")) a.substring(1) else a)
+        .filter(_.nonEmpty)
+        .toSet
+    val excludeTypeSet = excludeArgTypes.filter(_.nonEmpty).toSet
+
+    def isExcludedParam(p: io.shiftleft.codepropertygraph.generated.nodes.MethodParameterIn): Boolean = {
+        val annoExcluded =
+            excludeAnnoSet.nonEmpty && p.annotation.name.exists(excludeAnnoSet.contains)
+        val tfn = p.typeFullName
+        val typeExcluded =
+            excludeTypeSet.nonEmpty && tfn != null && tfn.nonEmpty &&
+                (excludeTypeSet.contains(tfn) || excludeTypeSet.exists(t => tfn.endsWith("." + t)))
+        annoExcluded || typeExcluded
+    }
+
+    val taintParamCache = mutable.Map[Long, List[io.shiftleft.codepropertygraph.generated.nodes.MethodParameterIn]]()
+    def taintParams(source: Method): List[io.shiftleft.codepropertygraph.generated.nodes.MethodParameterIn] = {
+        taintParamCache.getOrElseUpdate(source.id, {
+            if (excludeAnnoSet.isEmpty && excludeTypeSet.isEmpty) source.parameter.l
+            else source.parameter.filterNot(isExcludedParam).l
+        })
+    }
 
     // ── Caches ──
     // source fullName → Method
@@ -244,18 +274,22 @@ def findPathsBatch(paramsPath: String, outputPath: String, sanitizers: Seq[Strin
                             skippedBfs += 1
                         } else {
                             // Data flow check only on BFS-confirmed candidates
+                            val sourceTaintParams = taintParams(source)
                             for (cand <- reachableCandidates if sinkFullName.isEmpty) {
                                 try {
                                     val sinkArgCand = cand.argument
-                                    val flows = sinkArgCand.reachableByFlows(source.parameter)
                                     // Sanitized when every flow passes a sanitizer; report only
                                     // if at least one clean (unsanitized) path reaches the sink.
                                     val reachable =
-                                        if (sanitizers.isEmpty) flows.nonEmpty
-                                        else flows.exists(p => !p.elements.exists {
-                                            case c: Call => isSanitizerCall(c)
-                                            case _ => false
-                                        })
+                                        if (sourceTaintParams.isEmpty) false
+                                        else {
+                                            val flows = sinkArgCand.reachableByFlows(sourceTaintParams)
+                                            if (sanitizers.isEmpty) flows.nonEmpty
+                                            else flows.exists(p => !p.elements.exists {
+                                                case c: Call => isSanitizerCall(c)
+                                                case _ => false
+                                            })
+                                        }
                                     if (reachable) {
                                         sinkFullName = Some(cand.method.fullName)
                                         callNode = Some(cand)

@@ -328,10 +328,10 @@ def execute_once = {{
             yield f"{source.methodName}\t{sink.get('lineNumber', '')}\t{sink.get('file', '')}"
 
     @staticmethod
-    def _sanitizer_seq_literal(sanitizers) -> str:
-        return "Seq(" + ", ".join(_scala_literal(s) for s in (sanitizers or []) if s) + ")"
+    def _seq_literal(values) -> str:
+        return "Seq(" + ", ".join(_scala_literal(v) for v in (values or []) if v) + ")"
 
-    def run_batch_reachability(self, pairs, sanitizers=None):
+    def run_batch_reachability(self, pairs, sanitizers=None, exclude_arg_annotations=None, exclude_arg_types=None):
         CHUNK_SIZE = self._get_astrail_config().get("chunk_size", 100_000)
         iterator_pairs = iter(pairs)
         chunks = list(itertools.islice(iterator_pairs, CHUNK_SIZE))
@@ -343,14 +343,19 @@ def execute_once = {{
             while chunks:
                 processed_pairs += len(chunks)
                 logging.info("Processing batch reachability chunk with %d pairs processed so far", processed_pairs)
-                chunk_results = self.run_batch_reachability_chunk(chunks, sanitizers)
+                chunk_results = self.run_batch_reachability_chunk(
+                    chunks,
+                    sanitizers,
+                    exclude_arg_annotations=exclude_arg_annotations,
+                    exclude_arg_types=exclude_arg_types,
+                )
                 results.extend(chunk_results)
                 chunks = list(itertools.islice(iterator_pairs, CHUNK_SIZE))
         except Exception as exc:
             raise AstrailEngineError(f"Error in batch reachability: {exc}") from exc
         return results 
 
-    def run_batch_reachability_chunk(self, pairs, sanitizers=None):
+    def run_batch_reachability_chunk(self, pairs, sanitizers=None, exclude_arg_annotations=None, exclude_arg_types=None):
         params_tmp = self._write_params_file({"pair": self._encode_pairs(pairs)})
         if os.path.getsize(params_tmp) == 0:
             os.remove(params_tmp)
@@ -378,9 +383,12 @@ def execute_once = {{
 
             params_escaped = params_tmp.replace("\\", "\\\\")
             output_escaped = output_tmp.replace("\\", "\\\\")
-            sanitizer_seq = self._sanitizer_seq_literal(sanitizers)
+            sanitizer_seq = self._seq_literal(sanitizers)
+            exclude_anno_seq = self._seq_literal(exclude_arg_annotations)
+            exclude_type_seq = self._seq_literal(exclude_arg_types)
             script = query_content + (
-                f'\nfindPathsBatch("{params_escaped}", "{output_escaped}", {sanitizer_seq})'
+                f'\nfindPathsBatch("{params_escaped}", "{output_escaped}", '
+                f'{sanitizer_seq}, {exclude_anno_seq}, {exclude_type_seq})'
             )
             result = self._execute_query_sync(script, timeout=3600)
 
@@ -435,7 +443,7 @@ def execute_once = {{
 
             params_escaped = params_tmp.replace("\\", "\\\\")
             output_escaped = output_tmp.replace("\\", "\\\\")
-            sanitizer_seq = self._sanitizer_seq_literal(sanitizers)
+            sanitizer_seq = self._seq_literal(sanitizers)
             script = query_content + (
                 f'\nfindAggressivePathsBatch("{params_escaped}", "{output_escaped}", {sanitizer_seq})'
             )
@@ -666,6 +674,73 @@ def execute_once = {{
         except Exception as exc:
             raise AstrailEngineError(
                 f"Error in request-body identifier analysis: {exc}"
+            ) from exc
+        finally:
+            for tmp in [params_tmp, output_tmp]:
+                if tmp and os.path.exists(tmp):
+                    try:
+                        os.remove(tmp)
+                    except OSError:
+                        pass
+
+    def run_ssrf_flow_analysis(
+        self,
+        pairs,
+        sink_names=None,
+        receiver_only_sinks=None,
+    ):
+        pair_values = list(self._encode_pairs(pairs))
+        if not pair_values:
+            return []
+
+        ping_result = self._execute_query_sync("1")
+        if ping_result.get("success") is False:
+            raise AstrailEngineError(
+                "Astrail server is not reachable for SSRF flow analysis."
+            )
+
+        query_file = self._query_file_path("ssrfFlow.scala")
+        if not os.path.exists(query_file):
+            raise AstrailEngineError(f"SSRF flow query file not found: {query_file}")
+
+        params_tmp = self._write_params_file(
+            {
+                "pair": pair_values,
+                "sinkName": sink_names or [],
+                "receiverOnlySink": receiver_only_sinks or [],
+            }
+        )
+        output_tmp = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as handle:
+                output_tmp = handle.name
+
+            with open(query_file, "r", encoding="utf-8") as handle:
+                query_content = handle.read()
+
+            params_escaped = params_tmp.replace("\\", "\\\\")
+            output_escaped = output_tmp.replace("\\", "\\\\")
+            script = query_content + (
+                f'\nfindSsrfFlows("{params_escaped}", "{output_escaped}")'
+            )
+            result = self._execute_query_sync(script, timeout=1800)
+
+            if result.get("success") is False:
+                raise AstrailEngineError(
+                    f"SSRF flow query failed: {result.get('error', 'unknown')}"
+                )
+
+            if output_tmp and os.path.exists(output_tmp):
+                with open(output_tmp, "r", encoding="utf-8") as handle:
+                    data = handle.read()
+                if data:
+                    return json.loads(data)
+            return []
+        except AstrailEngineError:
+            raise
+        except Exception as exc:
+            raise AstrailEngineError(
+                f"Error in SSRF flow analysis: {exc}"
             ) from exc
         finally:
             for tmp in [params_tmp, output_tmp]:

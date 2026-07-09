@@ -11,6 +11,10 @@ LLMConfig:
 llm_review_enabled: false
 aggressiveScan: false
 
+excludeSourceArgs:
+  annotations: []
+  types: []
+
 vulnerabilityConfig:
    - command_injection
    - code_injection

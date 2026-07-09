@@ -26,6 +26,11 @@ class SourceConfig(BaseModel):
     annotations: List[str]
     source_methods: List[str] = []
 
+class SourceArgExclusionConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    annotations: List[str] = []
+    types: List[str] = []
+
 class ConfigSchema(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -39,4 +44,8 @@ class ConfigSchema(BaseModel):
     )
     llm_review_enabled: bool = Field(default=True, alias="llmReviewEnabled")
     aggressive_scan: bool = Field(default=False, alias="aggressiveScan")
+    exclude_source_args: SourceArgExclusionConfig = Field(
+        default_factory=SourceArgExclusionConfig,
+        alias="excludeSourceArgs",
+    )
     tools: Dict[str, Dict[str, Any]] = {}

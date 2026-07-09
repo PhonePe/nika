@@ -73,8 +73,18 @@ class AstrailEngine:
                 pairs, sanitizers=sanitizers
             )
         else:
+            exclude_source_args = getattr(config, "exclude_source_args", None)
+            exclude_arg_annotations = (
+                list(exclude_source_args.annotations) if exclude_source_args else []
+            )
+            exclude_arg_types = (
+                list(exclude_source_args.types) if exclude_source_args else []
+            )
             batch_result = self._get_query_runner().run_batch_reachability(
-                pairs, sanitizers=sanitizers
+                pairs,
+                sanitizers=sanitizers,
+                exclude_arg_annotations=exclude_arg_annotations,
+                exclude_arg_types=exclude_arg_types,
             )
 
         return translate_batch_reachability(batch_result)
@@ -138,6 +148,38 @@ class AstrailEngine:
             endpoint = entry.get("endpoint")
             if endpoint:
                 results[endpoint] = entry
+        return results
+
+    def find_ssrf_flows(
+        self,
+        context,
+        traces,
+        sink_names=None,
+        receiver_only_sinks=None,
+    ):
+        pairs = (
+            (
+                SimpleNamespace(methodName=trace.source_symbol),
+                {"lineNumber": trace.sink_line_number, "file": trace.sink_file_path},
+            )
+            for trace in (traces or [])
+            if getattr(trace, "source_symbol", None)
+            and getattr(trace, "sink_line_number", None)
+            and getattr(trace, "sink_file_path", None)
+        )
+        raw = self._get_query_runner().run_ssrf_flow_analysis(
+            pairs,
+            sink_names=sink_names,
+            receiver_only_sinks=receiver_only_sinks,
+        )
+        results = {}
+        for entry in raw or []:
+            key = (
+                entry.get("source"),
+                entry.get("fileName"),
+                int(entry.get("lineNumber") or 0),
+            )
+            results[key] = entry
         return results
 
     def find_open_redirect_flows(
