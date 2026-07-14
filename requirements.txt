@@ -45,7 +45,7 @@ ormsgpack==1.12.0
 packaging==25.0
 propcache==0.4.1
 pydantic==2.12.3
-pydantic-settings==2.12.0
+pydantic-settings==2.14.2
 pydantic_core==2.41.4
 python-dotenv==1.2.2
 PyYAML==6.0.3
