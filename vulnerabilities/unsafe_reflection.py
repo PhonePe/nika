@@ -4,6 +4,7 @@ from vulnerabilities.base.stages import (
     finalize_findings,
     match_rule_sinks,
     review_traces_with_llm,
+    enrich_tainted_variable_flows,
     run_dataflow,
 )
 
@@ -23,6 +24,7 @@ class UnsafeReflectionVulnerability(BaseVulnerability):
         match_rule_sinks,
         discover_sources,
         run_dataflow,
+        enrich_tainted_variable_flows,
         review_traces_with_llm,
         finalize_findings,
     ]
