@@ -2,6 +2,7 @@ import logging
 
 from vulnerabilities.base.base_vulnerability import BaseVulnerability
 from vulnerabilities.base.stages import (
+    _single_matching_sink_for_trace,
     discover_sources,
     finalize_findings,
     match_rule_sinks,
@@ -135,6 +136,42 @@ def _flow_key(source_symbol, file_path, line_number):
     return (source_symbol, file_path, int(line_number or 0))
 
 
+def _bool_from_engine(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.lower() == "true"
+    return None
+
+
+def _flow_metadata(entry):
+    request_controlled = _bool_from_engine(entry.get("requestControlled"))
+    metadata = {
+        "sink_kind": "ssrf",
+        "flow_confidence": entry.get("flowConfidence") or "cpg-destination-flow",
+    }
+    if request_controlled is not None:
+        metadata["request_controlled"] = request_controlled
+    if entry.get("sourceParam"):
+        metadata["source_param"] = entry.get("sourceParam")
+    if entry.get("sourceKind"):
+        metadata["source_kind"] = entry.get("sourceKind")
+    if entry.get("sinkArgument"):
+        metadata["sink_argument"] = entry.get("sinkArgument")
+    if entry.get("flowSummary"):
+        metadata["flow_summary"] = entry.get("flowSummary")
+    elif entry.get("sinkArgument"):
+        metadata["flow_summary"] = (
+            "Astrail confirmed request input reaches SSRF destination argument "
+            f"{entry.get('sinkArgument')}."
+        )
+    if entry.get("validationEvidence"):
+        metadata["validation_evidence"] = entry.get("validationEvidence")
+    if entry.get("sinkCode"):
+        metadata["sink_code"] = entry.get("sinkCode")
+    return metadata
+
+
 def refine_ssrf_flows(vulnerability, context, state):
     traces = getattr(state, "traces", None) or []
     if not traces:
@@ -181,19 +218,21 @@ def refine_ssrf_flows(vulnerability, context, state):
             getattr(trace.sink, "metadata", None) if getattr(trace, "sink", None) else None,
             entry.get("requestControlled") if entry is not None else None,
         )
-        if entry is not None and entry.get("requestControlled") is False:
+        if (
+            entry is not None
+            and _bool_from_engine(entry.get("requestControlled")) is False
+        ):
             dropped += 1
             continue
 
         if entry is not None:
-            sink = getattr(trace, "sink", None)
+            sink = getattr(trace, "sink", None) or _single_matching_sink_for_trace(
+                getattr(state, "sinks", None),
+                trace,
+            )
             if sink is not None:
                 metadata = dict(getattr(sink, "metadata", None) or {})
-                metadata["request_controlled"] = True
-                if entry.get("sinkArgument"):
-                    metadata["sink_argument"] = entry.get("sinkArgument")
-                if entry.get("sinkCode"):
-                    metadata["sink_code"] = entry.get("sinkCode")
+                metadata.update(_flow_metadata(entry))
                 trace = trace.model_copy(
                     update={"sink": sink.model_copy(update={"metadata": metadata})}
                 )
@@ -233,7 +272,10 @@ class SsrfVulnerability(BaseVulnerability):
         "Review this trace for SSRF risk. Treat outbound requests influenced by "
         "user input as vulnerable unless the destination is fixed or strongly "
         "allowlisted. If validation might be bypassed or the controls are unclear, "
-        "return NEED_MANUAL_REVIEW."
+        "return NEED_MANUAL_REVIEW. When sink evidence says Request controlled: "
+        "True, Astrail has already confirmed a CPG flow from remote input into the "
+        "request destination; do not spend tools re-proving that flow. Focus tool "
+        "lookups on fixed destinations, allowlisting, and validation instead."
     )
     human_prompt = (
         "Analyze this SSRF trace and decide whether attacker-controlled input can "

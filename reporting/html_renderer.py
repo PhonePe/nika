@@ -283,6 +283,10 @@ class HtmlReportRenderer:
                     <div class="label">Prompt Tokens</div>
                 </div>
                 <div class="stat">
+                    <div class="num accent">{tracker.cached_prompt_tokens}</div>
+                    <div class="label">Cached Prompt Tokens</div>
+                </div>
+                <div class="stat">
                     <div class="num accent">{tracker.completion_tokens}</div>
                     <div class="label">Completion Tokens</div>
                 </div>
