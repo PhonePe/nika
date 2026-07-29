@@ -385,7 +385,6 @@ class SecurityAgent:
             vulnerable_status: str,
             explanation: str,
             remediation: str,
-            code_fix: str,
         ) -> str:
             """
             Submits the final vulnerability assessment and ends the analysis.
@@ -396,7 +395,6 @@ class SecurityAgent:
                 vulnerable_status=vulnerable_status,
                 explanation=explanation,
                 remediation=remediation,
-                code_fix=code_fix,
             )
             return assessment.model_dump_json()
 
@@ -564,7 +562,6 @@ class SecurityAgent:
                     "Agent ended without submitting a valid structured assessment."
                 ),
                 remediation="Manual review required.",
-                code_fix="",
             )
         except Exception as exc:
             logging.error("SecurityAgent failed: %s", exc)
@@ -572,7 +569,6 @@ class SecurityAgent:
                 vulnerable_status="NEED_MANUAL_REVIEW",
                 explanation=f"Analysis failed due to error: {exc}",
                 remediation="Manual review required due to analysis error.",
-                code_fix="",
             )
 
     def _find_submitted_assessment(
@@ -641,7 +637,7 @@ class SecurityAgent:
 1. code_search_tool(filename, method_name)
 2. astrail_search_method_name(code, filename)
 3. grep_for_code(code_snippet)
-4. submit_assessment(vulnerable_status, explanation, remediation, code_fix)
+4. submit_assessment(vulnerable_status, explanation, remediation)
 
 ## TOOL CALL GUIDANCE
 - code_search_tool accepts an exact Java method, constructor, or field name.

@@ -109,22 +109,13 @@ class HtmlReportRenderer:
             status = getattr(v.analysis, "vulnerable_status", "NEED_MANUAL_REVIEW")
             explanation = getattr(v.analysis, "explanation", "No explanation provided")
             remediation = getattr(v.analysis, "remediation", "No remediation provided")
-            code_fix = getattr(v.analysis, "code_fix", None)
         else:
             status = "VULNERABLE"
             explanation = ""
             remediation = ""
-            code_fix = None
 
         taint_flow_section = self._trace_code_block(v)
         description_html = escape_html(vuln_description) if vuln_description else "Placeholder description for the vulnerability."
-
-        code_fix_section = ""
-        if code_fix:
-            code_fix_section = f"""
-            <div class="section-title">Code Fix</div>
-            <div class="explanation">{escape_html(code_fix)}</div>
-            """
 
         llm_sections = ""
         if has_llm:
@@ -133,7 +124,6 @@ class HtmlReportRenderer:
             <div class="explanation">{escape_html(explanation)}</div>
             <div class="section-title">Remediation</div>
             <div class="explanation">{escape_html(remediation)}</div>
-            {code_fix_section}
             """
 
         return f"""

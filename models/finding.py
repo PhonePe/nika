@@ -14,7 +14,6 @@ class Finding(BaseModel):
     status: str = "VULNERABLE"
     explanation: str | None = None
     remediation: str | None = None
-    code_fix: str | None = None
     trace: Trace | None = None
     call_node_count: int | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)

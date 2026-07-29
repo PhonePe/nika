@@ -114,7 +114,6 @@ def test_submitted_assessment_terminates_without_tool_execution():
                     "vulnerable_status": "NOT_VULNERABLE",
                     "explanation": "Input is validated before reaching the sink.",
                     "remediation": "No remediation required.",
-                    "code_fix": "",
                 },
                 "id": "assessment-1",
                 "type": "tool_call",

@@ -14,7 +14,6 @@ def _to_legacy_vulnerability(finding):
             vulnerable_status=finding.status,
             explanation=finding.explanation or "",
             remediation=finding.remediation or "",
-            code_fix=finding.code_fix or "",
         )
 
     call_graph = []

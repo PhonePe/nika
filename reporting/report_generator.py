@@ -57,6 +57,5 @@ class ReportGenerator:
                 if result.analysis:
                     logging.info("Analysis: %s", result.analysis.explanation)
                     logging.info("Vulnerability Status: %s", result.analysis.vulnerable_status)
-                    logging.info("Code Fix: %s", result.analysis.code_fix)
         logging.info("=== End Finding ===")
 
