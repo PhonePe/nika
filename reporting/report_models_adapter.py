@@ -9,7 +9,7 @@ from schema.vulnerability_schema import (
 
 def _to_legacy_vulnerability(finding):
     analysis = None
-    if finding.explanation or finding.remediation or finding.code_fix:
+    if finding.explanation or finding.remediation:
         analysis = LLMVulnerabilityOutput(
             vulnerable_status=finding.status,
             explanation=finding.explanation or "",

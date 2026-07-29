@@ -72,7 +72,6 @@ class JsonReportWriter:
                 if v.analysis:
                     finding_data["explanation"] = v.analysis.explanation
                     finding_data["remediation"] = v.analysis.remediation
-                    finding_data["code_fix"] = v.analysis.code_fix
 
                 if v.call_graph:
                     finding_data["callGraph"] = [

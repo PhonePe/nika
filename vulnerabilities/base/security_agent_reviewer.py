@@ -10,7 +10,6 @@ def _fallback_review(vulnerability, reason: str) -> dict[str, Any]:
         "vulnerable_status": "NEED_MANUAL_REVIEW",
         "explanation": reason,
         "remediation": getattr(vulnerability, "fallback_remediation", None),
-        "code_fix": getattr(vulnerability, "fallback_code_fix", None),
     }
 
 
@@ -31,7 +30,6 @@ def _normalize_review(output, vulnerability) -> dict[str, Any]:
         or "NEED_MANUAL_REVIEW",
         "explanation": review.get("explanation"),
         "remediation": review.get("remediation"),
-        "code_fix": review.get("code_fix"),
     }
 
 
