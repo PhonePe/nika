@@ -47,7 +47,3 @@ class CommandInjectionVulnerability(BaseVulnerability):
         "Avoid shell invocation and pass fixed commands with separately tokenized "
         "arguments after strict validation."
     )
-    fallback_code_fix = (
-        "Replace command-string construction with a fixed executable plus validated "
-        "argument list."
-    )

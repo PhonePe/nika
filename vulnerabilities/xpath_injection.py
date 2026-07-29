@@ -50,7 +50,3 @@ class XpathInjectionVulnerability(BaseVulnerability):
         "Bind user input through XPath variables (XPathVariableResolver) instead of "
         "concatenating it into the expression string."
     )
-    fallback_code_fix = (
-        "Use parameterized XPath with variable references (e.g. $var) resolved via "
-        "an XPathVariableResolver rather than string concatenation."
-    )

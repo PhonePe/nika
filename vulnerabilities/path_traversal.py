@@ -48,7 +48,3 @@ class PathTraversalVulnerability(BaseVulnerability):
         "Canonicalize the resolved path and verify it remains under an expected base "
         "directory before use."
     )
-    fallback_code_fix = (
-        "Replace direct path concatenation with canonicalization plus a strict "
-        "prefix check on the resolved path."
-    )

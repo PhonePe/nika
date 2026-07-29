@@ -160,7 +160,6 @@ def default_llm_review(vulnerability):
         "vulnerable_status": "VULNERABLE",
         "explanation": getattr(vulnerability, "fallback_explanation", None),
         "remediation": getattr(vulnerability, "fallback_remediation", None),
-        "code_fix": getattr(vulnerability, "fallback_code_fix", None),
     }
 
 
@@ -335,7 +334,6 @@ def _finding_from_sink(vulnerability_id, sink, review=None, trace=None, metadata
         status=_review_status(review),
         explanation=review.get("explanation"),
         remediation=review.get("remediation"),
-        code_fix=review.get("code_fix"),
         trace=trace,
         call_node_count=getattr(trace, "call_node_count", None) if trace is not None else None,
         metadata=metadata or sink_metadata,
@@ -456,7 +454,6 @@ def finalize_sink_findings(vulnerability, context, state):
         state.sinks,
         explanation=review.get("explanation"),
         remediation=review.get("remediation"),
-        code_fix=review.get("code_fix"),
     )
 
 
@@ -493,7 +490,6 @@ def direct_static_findings(
     line_number_end=None,
     explanation=None,
     remediation=None,
-    code_fix=None,
     metadata=None,
 ):
     findings = []
@@ -509,7 +505,6 @@ def direct_static_findings(
                 status=status,
                 explanation=_value_from_item(item, explanation),
                 remediation=_value_from_item(item, remediation),
-                code_fix=_value_from_item(item, code_fix),
                 metadata=_value_from_item(item, metadata, {}) or {},
             )
         )
@@ -524,7 +519,6 @@ def direct_findings_from_sinks(
     status: str = "VULNERABLE",
     explanation: str | None = None,
     remediation: str | None = None,
-    code_fix: str | None = None,
     metadata: dict[str, str] | None = None,
 ):
     return direct_static_findings(
@@ -537,6 +531,5 @@ def direct_findings_from_sinks(
         line_number_end=lambda sink: sink.line_number_end or sink.line_number,
         explanation=explanation,
         remediation=remediation,
-        code_fix=code_fix,
         metadata=metadata,
     )

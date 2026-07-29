@@ -48,7 +48,3 @@ class InsecureCryptoVulnerability(BaseVulnerability):
         "Use modern cryptographic primitives and safe key, IV, and randomness "
         "handling aligned with current security standards."
     )
-    fallback_code_fix = (
-        "Replace weak crypto primitives and hardcoded secrets with strong algorithms "
-        "and securely generated keys/IVs."
-    )

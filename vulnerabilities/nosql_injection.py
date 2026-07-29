@@ -52,7 +52,3 @@ class NoSqlInjectionVulnerability(BaseVulnerability):
         "user-controlled JSON into query documents, and avoid $where/JavaScript "
         "expressions driven by user input."
     )
-    fallback_code_fix = (
-        "Use parameterized query builders (e.g. Spring Data Criteria) with bound "
-        "values instead of parsing user input into a query document."
-    )

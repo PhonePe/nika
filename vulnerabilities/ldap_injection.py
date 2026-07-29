@@ -49,7 +49,3 @@ class LdapInjectionVulnerability(BaseVulnerability):
         "Escape user input used in LDAP filters and DNs (RFC 4515/4514) or use "
         "parameterized filter arguments instead of string concatenation."
     )
-    fallback_code_fix = (
-        "Encode user input with an LDAP encoder or pass it as a bound filter "
-        "argument rather than concatenating it into the filter string."
-    )

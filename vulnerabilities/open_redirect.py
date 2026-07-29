@@ -437,7 +437,3 @@ class OpenRedirectVulnerability(BaseVulnerability):
         "Redirect only to relative paths or destinations validated against a strict "
         "allowlist of permitted hosts; reject absolute or protocol-relative URLs."
     )
-    fallback_code_fix = (
-        "Do not build redirect targets directly from user input; map input to an "
-        "approved set of destinations or enforce relative-path-only redirects."
-    )

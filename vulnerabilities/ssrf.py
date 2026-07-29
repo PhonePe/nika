@@ -290,7 +290,3 @@ class SsrfVulnerability(BaseVulnerability):
         "Use fixed destinations or strict allowlists for hosts, schemes, and ports "
         "before making outbound requests."
     )
-    fallback_code_fix = (
-        "Do not build request destinations directly from user input; map input to "
-        "approved endpoints instead."
-    )
