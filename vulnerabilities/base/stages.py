@@ -5,6 +5,13 @@ import re
 from models.evidence import EvidenceBundle
 from models.finding import Finding
 from vulnerabilities.base.security_agent_reviewer import run_security_agent_review
+from vulnerabilities.base.taint_flow_helper import (
+    _flow_key as _taint_flow_key,
+    build_dynamic_explanation,
+    engine_flow_metadata,
+    get_request_accessors,
+    get_request_annotations,
+)
 
 def empty_evidence_bundle() -> EvidenceBundle:
     return EvidenceBundle()
@@ -60,6 +67,126 @@ def run_dataflow(vulnerability, context, state):
         context, state.sources, state.sinks, sanitizers=sanitizers
     )
     logging.info("Found %d vulnerabilities for %s", len(state.traces), vulnerability.vulnerability_id)
+    return state
+
+
+def _vulnerability_taint_config(vulnerability):
+    source_annotations = list(get_request_annotations(vulnerability.vulnerability_id))
+    request_accessors = list(get_request_accessors(vulnerability.vulnerability_id))
+    sink_names = list(getattr(vulnerability, "tainted_flow_sink_names", None) or [])
+    receiver_only_sinks = list(
+        getattr(vulnerability, "tainted_flow_receiver_only_sinks", None) or []
+    )
+    return source_annotations, request_accessors, sink_names, receiver_only_sinks
+
+
+def enrich_tainted_variable_flows(vulnerability, context, state):
+    traces = getattr(state, "traces", None) or []
+    logging.info(
+        "%s: tainted-variable flow enrichment stage invoked (%d trace(s))",
+        vulnerability.vulnerability_id,
+        len(traces),
+    )
+    if not traces:
+        logging.info(
+            "%s: tainted-variable flow enrichment skipped (no traces)",
+            vulnerability.vulnerability_id,
+        )
+        return state
+
+    engine = context.engines.get("dataflow_analyzer") if hasattr(context, "engines") else None
+    flow_resolver = getattr(engine, "find_tainted_variable_flows", None)
+    if not callable(flow_resolver):
+        logging.info(
+            "%s: tainted-variable flow enrichment skipped (engine %r has no find_tainted_variable_flows)",
+            vulnerability.vulnerability_id,
+            type(engine).__name__ if engine is not None else None,
+        )
+        return state
+
+    source_annotations, request_accessors, sink_names, receiver_only_sinks = (
+        _vulnerability_taint_config(vulnerability)
+    )
+
+    try:
+        engine_flows = (
+            flow_resolver(
+                context,
+                traces,
+                source_annotations=source_annotations,
+                request_accessors=request_accessors,
+                sink_names=sink_names,
+                receiver_only_sinks=receiver_only_sinks,
+            )
+            or {}
+        )
+    except Exception:
+        logging.warning(
+            "%s: tainted-variable flow enrichment failed; keeping traces unchanged",
+            vulnerability.vulnerability_id,
+            exc_info=True,
+        )
+        return state
+
+    if not engine_flows:
+        logging.info(
+            "%s: tainted-variable flow enrichment ran but engine returned 0 flow entries for %d trace(s)",
+            vulnerability.vulnerability_id,
+            len(traces),
+        )
+        return state
+
+    base_explanation = getattr(vulnerability, "fallback_explanation", None) or ""
+    source_lookup = _source_lookup(getattr(state, "sources", None))
+    sinks = getattr(state, "sinks", None)
+    enriched = []
+    enriched_count = 0
+
+    for trace in traces:
+        entry = engine_flows.get(
+            _taint_flow_key(
+                getattr(trace, "source_symbol", None),
+                getattr(trace, "sink_file_path", None),
+                getattr(trace, "sink_line_number", None),
+            )
+        )
+        sink = getattr(trace, "sink", None) or _single_matching_sink_for_trace(sinks, trace)
+        if entry is None or sink is None:
+            enriched.append(trace)
+            continue
+
+        taint_metadata = engine_flow_metadata(vulnerability.vulnerability_id, entry)
+        metadata = dict(getattr(sink, "metadata", None) or {})
+        if taint_metadata:
+            metadata.update(taint_metadata)
+            if metadata.get("request_controlled") is not False:
+                metadata["tainted_flow_explanation"] = build_dynamic_explanation(
+                    vulnerability.vulnerability_id,
+                    trace,
+                    taint_metadata,
+                    base_explanation,
+                )
+
+        source = getattr(trace, "source", None) or source_lookup.get(
+            getattr(trace, "source_symbol", None)
+        )
+        enriched.append(
+            trace.model_copy(
+                update={"sink": sink.model_copy(update={"metadata": metadata}), "source": source}
+            )
+        )
+        if metadata.get("tainted_flow_explanation"):
+            enriched_count += 1
+
+    logging.info(
+        "%s: tainted-variable flow enrichment matched %d of %d trace(s) (engine returned %d flow entr%s)",
+        vulnerability.vulnerability_id,
+        enriched_count,
+        len(traces),
+        len(engine_flows),
+        "y" if len(engine_flows) == 1 else "ies",
+    )
+    state.traces = enriched
     return state
 
 
@@ -243,6 +370,8 @@ def _format_sink_evidence(sink, trace):
         lines.append(f"Source parameter: {source_text}")
     if metadata.get("sink_argument"):
         lines.append(f"Sink argument: {metadata.get('sink_argument')}")
+    if metadata.get("tainted_variable"):
+        lines.append(f"Tainted variable: {metadata.get('tainted_variable')}")
     if metadata.get("flow_summary"):
         lines.append(f"Flow summary: {metadata.get('flow_summary')}")
     if metadata.get("validation_evidence"):
@@ -321,11 +450,28 @@ def _matching_sinks_for_trace(sinks, trace):
     ]
 
 
+def _combine_explanation(review_explanation, taint_explanation):
+    review_explanation = (review_explanation or "").strip()
+    taint_explanation = (taint_explanation or "").strip()
+    if not taint_explanation:
+        return review_explanation or None
+    if not review_explanation:
+        return taint_explanation
+    if review_explanation in taint_explanation:
+        return taint_explanation
+    return f"{review_explanation}\n\n{taint_explanation}"
+
+
 def _finding_from_sink(vulnerability_id, sink, review=None, trace=None, metadata=None):
     review = review or {}
     sink_metadata = dict(getattr(sink, "metadata", None) or {})
     if getattr(sink, "rule_id", None):
         sink_metadata.setdefault("rule_id", sink.rule_id)
+    effective_metadata = metadata or sink_metadata
+    explanation = _combine_explanation(
+        review.get("explanation"),
+        effective_metadata.get("tainted_flow_explanation"),
+    )
     return Finding(
         vulnerability_id=vulnerability_id,
         sink=sink.code,
@@ -333,12 +479,12 @@ def _finding_from_sink(vulnerability_id, sink, review=None, trace=None, metadata
         line_number=sink.line_number,
         line_number_end=sink.line_number_end or sink.line_number,
         status=_review_status(review),
-        explanation=review.get("explanation"),
+        explanation=explanation,
         remediation=review.get("remediation"),
         code_fix=review.get("code_fix"),
         trace=trace,
         call_node_count=getattr(trace, "call_node_count", None) if trace is not None else None,
-        metadata=metadata or sink_metadata,
+        metadata=effective_metadata,
     )
 
 
