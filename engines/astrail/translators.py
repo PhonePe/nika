@@ -37,10 +37,22 @@ def _extract_source_symbol(entry: dict) -> str | None:
         return source
     return None
 
+
+def _extract_source_param(entry: dict) -> str | None:
+    source_param = entry.get("sourceParam")
+    if not isinstance(source_param, str):
+        return None
+    source_param = source_param.strip()
+    if not source_param or source_param == "this":
+        return None
+    return source_param
+
+
 def translate_batch_reachability(raw: list[dict]) -> list[Trace]:
     traces = []
 
     for entry in raw:
+        source_param = _extract_source_param(entry)
         nodes = []
         for node in entry.get("path", []):
             is_external = node.get("isExternal", False)
@@ -72,6 +84,8 @@ def translate_batch_reachability(raw: list[dict]) -> list[Trace]:
                 sink_line_number=int(entry.get("lineNumber") or 0),
                 nodes=nodes,
                 source_symbol=_extract_source_symbol(entry),
+                source_param=source_param,
+                source_kind=(entry.get("sourceKind") or None) if source_param else None,
                 call_node_count=_normalize_optional_int(entry.get("callNodeCount")),
             )
         )

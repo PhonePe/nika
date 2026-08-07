@@ -11,6 +11,8 @@ from vulnerabilities.base.stages import (
 class PathTraversalVulnerability(BaseVulnerability):
     vulnerability_id = "path_traversal"
     title = "Path Traversal"
+    review_grouping = "source_method"
+    report_grouping = "source_method"
     description = (
         "Path Traversal vulnerability allows attackers to access files and "
         "directories outside the intended scope by manipulating file paths."
