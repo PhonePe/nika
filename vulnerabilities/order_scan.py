@@ -12,12 +12,6 @@ DEFAULT_REMEDIATION = (
     "the order-scan rule."
 )
 
-DEFAULT_CODE_FIX = (
-    "Update the method-call chain so required validation and control checks run "
-    "before downstream processing steps."
-)
-
-
 class OrderScanVulnerability(BaseVulnerability):
     vulnerability_id = "order_scan"
     title = "Violation of Order Scan"
@@ -42,5 +36,4 @@ class OrderScanVulnerability(BaseVulnerability):
             status="VULNERABLE",
             explanation=DEFAULT_EXPLANATION,
             remediation=DEFAULT_REMEDIATION,
-            code_fix=DEFAULT_CODE_FIX,
         )

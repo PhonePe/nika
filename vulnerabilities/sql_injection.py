@@ -46,7 +46,3 @@ class SqlInjectionVulnerability(BaseVulnerability):
         "Verify whether user-controlled input reaches the query without "
         "parameterization."
     )
-    fallback_code_fix = (
-        "Use parameterized queries or prepared statements for user-controlled "
-        "values."
-    )

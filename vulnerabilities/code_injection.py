@@ -48,7 +48,3 @@ class CodeInjectionVulnerability(BaseVulnerability):
         "Do not evaluate untrusted input as code or expressions unless it is mapped "
         "to a strict allowlist of safe operations."
     )
-    fallback_code_fix = (
-        "Replace dynamic expression construction from user input with fixed "
-        "expressions and validated parameters."
-    )

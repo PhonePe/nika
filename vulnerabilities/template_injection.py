@@ -47,7 +47,3 @@ class TemplateInjectionVulnerability(BaseVulnerability):
         "Keep templates fixed and pass user input only as escaped, non-executable "
         "data values."
     )
-    fallback_code_fix = (
-        "Remove user-controlled template construction and render a fixed template "
-        "with bound data variables instead."
-    )

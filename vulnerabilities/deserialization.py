@@ -48,7 +48,3 @@ class DeserializationVulnerability(BaseVulnerability):
         "Use safe deserializers or enforce a strict allowlist of permitted classes "
         "and types for untrusted data."
     )
-    fallback_code_fix = (
-        "Replace generic object deserialization of user input with a safe, typed "
-        "deserialization path and explicit class filtering."
-    )

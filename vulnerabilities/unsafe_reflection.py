@@ -49,7 +49,3 @@ class UnsafeReflectionVulnerability(BaseVulnerability):
         "Map untrusted input to a fixed allowlist of permitted classes or methods "
         "before any reflective operation."
     )
-    fallback_code_fix = (
-        "Replace reflection driven by user input with an explicit allowlisted "
-        "dispatch table."
-    )

@@ -1,5 +1,6 @@
 import base64
 import os
+from pathlib import Path
 
 from engines.astrail.query_runner import AstrailQueryRunner, _scala_literal
 
@@ -51,3 +52,10 @@ def test_params_file_roundtrip_handles_hostile_values():
     assert "empty" not in groups
     fullname, ids = groups["endpoint"][0].split("\t", 1)
     assert fullname == "com.x.Foo.bar:int(int)" and ids == "userId,orderId"
+
+
+def test_batch_reachability_excludes_implicit_receiver_from_taint_sources():
+    query_path = Path(__file__).parents[2] / "queries" / "batchReachabilityCheck.scala"
+    query = query_path.read_text(encoding="utf-8")
+
+    assert 'p.name != "this" && !isExcludedParam(p)' in query

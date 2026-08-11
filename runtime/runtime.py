@@ -134,6 +134,11 @@ class NikaApplicationRuntime:
             else ("0" if llm_enabled else "N/A")
         )
         total_tokens_value = str(token_snapshot["total_tokens"]) if llm_enabled else "N/A"
+        cached_tokens_value = (
+            str(token_snapshot["cached_prompt_tokens"])
+            if llm_enabled
+            else "N/A"
+        )
         total_cost_value = f"${token_snapshot['total_cost']:.4f}" if llm_enabled else "N/A"
 
         rows = [
@@ -142,6 +147,7 @@ class NikaApplicationRuntime:
             ("Total False Positives", false_positive_value),
             ("Total Time Taken", self._format_duration(elapsed_seconds)),
             ("Total Tokens Used", total_tokens_value),
+            ("Cached Prompt Tokens", cached_tokens_value),
             ("Total Cost", total_cost_value),
         ]
 

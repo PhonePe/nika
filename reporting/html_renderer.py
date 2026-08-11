@@ -109,22 +109,14 @@ class HtmlReportRenderer:
             status = getattr(v.analysis, "vulnerable_status", "NEED_MANUAL_REVIEW")
             explanation = getattr(v.analysis, "explanation", "No explanation provided")
             remediation = getattr(v.analysis, "remediation", "No remediation provided")
-            code_fix = getattr(v.analysis, "code_fix", None)
         else:
             status = "VULNERABLE"
             explanation = ""
             remediation = ""
-            code_fix = None
 
         taint_flow_section = self._trace_code_block(v)
+        related_sinks_section = self._related_sinks_section(v)
         description_html = escape_html(vuln_description) if vuln_description else "Placeholder description for the vulnerability."
-
-        code_fix_section = ""
-        if code_fix:
-            code_fix_section = f"""
-            <div class="section-title">Code Fix</div>
-            <div class="explanation">{escape_html(code_fix)}</div>
-            """
 
         llm_sections = ""
         if has_llm:
@@ -133,7 +125,6 @@ class HtmlReportRenderer:
             <div class="explanation">{escape_html(explanation)}</div>
             <div class="section-title">Remediation</div>
             <div class="explanation">{escape_html(remediation)}</div>
-            {code_fix_section}
             """
 
         return f"""
@@ -145,9 +136,39 @@ class HtmlReportRenderer:
             <div class="section-title">Description</div>
             <div class="explanation">{description_html}</div>
             {taint_flow_section}
+            {related_sinks_section}
             {llm_sections}
         </div>
         """
+
+    @staticmethod
+    def _related_sinks_section(v: Vulnerability) -> str:
+        metadata = getattr(v, "metadata", None) or {}
+        finding_group = metadata.get("finding_group") or {}
+        related_sinks = finding_group.get("related_sinks") or []
+        if not related_sinks:
+            return ""
+
+        occurrences = []
+        for occurrence in related_sinks:
+            filename = occurrence.get("filename") or "Unknown file"
+            line_number = occurrence.get("lineNumber") or "?"
+            sink = occurrence.get("sink") or ""
+            occurrences.append(
+                '<div class="flow-step-title">'
+                f'Related sink ({escape_html(str(filename))}:{escape_html(str(line_number))})'
+                '</div>'
+                f'<pre class="code-block">{escape_html(str(sink))}</pre>'
+            )
+
+        occurrence_count = finding_group.get("occurrence_count") or (
+            len(related_sinks) + 1
+        )
+        return (
+            '<div class="section-title">Related Sink Occurrences '
+            f'({escape_html(str(occurrence_count))} total)</div>'
+            + "".join(occurrences)
+        )
 
     # ------------------------------------------------------------------
     # Trace / code block rendering
@@ -281,6 +302,10 @@ class HtmlReportRenderer:
                 <div class="stat">
                     <div class="num accent">{tracker.prompt_tokens}</div>
                     <div class="label">Prompt Tokens</div>
+                </div>
+                <div class="stat">
+                    <div class="num accent">{tracker.cached_prompt_tokens}</div>
+                    <div class="label">Cached Prompt Tokens</div>
                 </div>
                 <div class="stat">
                     <div class="num accent">{tracker.completion_tokens}</div>

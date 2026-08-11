@@ -51,18 +51,17 @@ def test_finding_from_sink_without_metadata_is_empty():
 
 def test_default_llm_review_uses_fallbacks():
     vuln = SimpleNamespace(
-        fallback_explanation="exp", fallback_remediation="rem", fallback_code_fix="fix"
+        fallback_explanation="exp", fallback_remediation="rem"
     )
     review = default_llm_review(vuln)
     assert review["vulnerable_status"] == "VULNERABLE"
     assert review["explanation"] == "exp"
     assert review["remediation"] == "rem"
-    assert review["code_fix"] == "fix"
 
 
 def test_direct_findings_from_sinks():
     sinks = [_sink(code="c1"), _sink(file_path="B.java", code="c2")]
-    findings = direct_findings_from_sinks("v", sinks, explanation="e", remediation="r", code_fix="f")
+    findings = direct_findings_from_sinks("v", sinks, explanation="e", remediation="r")
     assert [f.sink for f in findings] == ["c1", "c2"]
     assert findings[1].file_path == "B.java"
     assert all(f.explanation == "e" and f.status == "VULNERABLE" for f in findings)
@@ -70,7 +69,7 @@ def test_direct_findings_from_sinks():
 
 def test_findings_from_sink_review_pairs_and_carries_metadata():
     sinks = [_sink(metadata={"class_api_path": "/a"})]
-    reviews = [{"explanation": "e", "status": "NEED_MANUAL_REVIEW", "remediation": "r", "code_fix": "f"}]
+    reviews = [{"explanation": "e", "status": "NEED_MANUAL_REVIEW", "remediation": "r"}]
     findings = findings_from_sink_review("v", sinks, reviews)
     assert len(findings) == 1
     assert findings[0].status == "NEED_MANUAL_REVIEW"

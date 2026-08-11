@@ -47,7 +47,3 @@ class XxeVulnerability(BaseVulnerability):
         "Disable external entities, DTD processing, and similar unsafe XML parser "
         "features for untrusted input."
     )
-    fallback_code_fix = (
-        "Use secure parser settings that reject external entities before parsing "
-        "user-controlled XML."
-    )

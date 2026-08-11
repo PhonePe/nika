@@ -188,8 +188,9 @@ def findPathsBatch(
     val taintParamCache = mutable.Map[Long, List[io.shiftleft.codepropertygraph.generated.nodes.MethodParameterIn]]()
     def taintParams(source: Method): List[io.shiftleft.codepropertygraph.generated.nodes.MethodParameterIn] = {
         taintParamCache.getOrElseUpdate(source.id, {
-            if (excludeAnnoSet.isEmpty && excludeTypeSet.isEmpty) source.parameter.l
-            else source.parameter.filterNot(isExcludedParam).l
+            source.parameter
+                .filter(p => p.name != "this" && !isExcludedParam(p))
+                .l
         })
     }
 
@@ -263,6 +264,8 @@ def findPathsBatch(
                         var sinkFullName: Option[String] = None
                         var callNode: Option[Call] = None
                         var sinkCallNodeCount: Int = 0
+                        var sourceParamName: Option[String] = None
+                        var sourceParamKind: Option[String] = None
 
                         // BFS pre-filter: check if ANY candidate sink method is reachable
                         val reachSet = bfsReachableSet(source)
@@ -296,6 +299,11 @@ def findPathsBatch(
                                         sinkCallNodeCount = bestFlow.elements.collect {
                                             case c: Call => c
                                         }.size
+                                        val bestSourceParam = sourceTaintParams.find(param =>
+                                            bestFlow.elements.exists(_.id == param.id)
+                                        )
+                                        sourceParamName = bestSourceParam.map(_.name)
+                                        sourceParamKind = bestSourceParam.map(_ => "method parameter")
                                         sinkFullName = Some(cand.method.fullName)
                                         callNode = Some(cand)
                                     }
@@ -363,7 +371,7 @@ def findPathsBatch(
 
                                     if (results.nonEmpty) {
                                         val pathJson = results.mkString("[", ",", "]")
-                                        val entryJson = s"""{"source":"${esc(sourceFullName)}","lineNumber":$lineNumber,"fileName":"${esc(fileName)}","callNodeCount":$sinkCallNodeCount,"path":$pathJson}"""
+                                        val entryJson = s"""{"source":"${esc(sourceFullName)}","sourceParam":"${esc(sourceParamName.getOrElse(""))}","sourceKind":"${esc(sourceParamKind.getOrElse(""))}","lineNumber":$lineNumber,"fileName":"${esc(fileName)}","callNodeCount":$sinkCallNodeCount,"path":$pathJson}"""
                                         allResults.append(entryJson)
                                     }
                                 }

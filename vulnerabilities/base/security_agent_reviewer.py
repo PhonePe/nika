@@ -10,7 +10,6 @@ def _fallback_review(vulnerability, reason: str) -> dict[str, Any]:
         "vulnerable_status": "NEED_MANUAL_REVIEW",
         "explanation": reason,
         "remediation": getattr(vulnerability, "fallback_remediation", None),
-        "code_fix": getattr(vulnerability, "fallback_code_fix", None),
     }
 
 
@@ -31,7 +30,6 @@ def _normalize_review(output, vulnerability) -> dict[str, Any]:
         or "NEED_MANUAL_REVIEW",
         "explanation": review.get("explanation"),
         "remediation": review.get("remediation"),
-        "code_fix": review.get("code_fix"),
     }
 
 
@@ -61,6 +59,7 @@ def run_security_agent_review(
     evidence,
     *,
     agent_factory=None,
+    human_prompt=None,
 ):
     from agents.security_agent import SecurityAgent, SecurityAgentRuntimeContext
 
@@ -68,7 +67,8 @@ def run_security_agent_review(
         agent_factory = SecurityAgent
 
     system_prompt = vulnerability.build_system_prompt(evidence)
-    human_prompt = vulnerability.build_human_prompt(evidence)
+    if human_prompt is None:
+        human_prompt = vulnerability.build_human_prompt(evidence)
 
     astrail_engine = context.engines.get("dataflow_analyzer") or context.engines.get(
         "source_finder"

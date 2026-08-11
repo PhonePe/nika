@@ -1,6 +1,10 @@
 import json
 
-from engines.astrail.translators import _normalize_optional_int, translate_sources
+from engines.astrail.translators import (
+    _normalize_optional_int,
+    translate_batch_reachability,
+    translate_sources,
+)
 from engines.opengrep.translators import translate_opengrep_results
 
 
@@ -63,3 +67,41 @@ def test_translate_sources_maps_api_path_metadata():
     s = sources[0]
     assert s.symbol == "com.x.C.f:void()" and s.file_path == "C.java" and s.line_number == 3
     assert s.metadata["class_api_path"] == "/api" and s.metadata["method_api_path"] == "/x"
+
+
+def test_translate_batch_reachability_maps_source_parameter():
+    traces = translate_batch_reachability(
+        [
+            {
+                "source": "com.x.Controller.upload:void(java.lang.String)",
+                "sourceParam": "filename",
+                "sourceKind": "method parameter",
+                "fileName": "Service.java",
+                "lineNumber": 12,
+                "path": [],
+            }
+        ]
+    )
+
+    assert len(traces) == 1
+    assert traces[0].source_param == "filename"
+    assert traces[0].source_kind == "method parameter"
+
+
+def test_translate_batch_reachability_ignores_implicit_receiver():
+    traces = translate_batch_reachability(
+        [
+            {
+                "source": "com.x.Controller.upload:void(java.lang.String)",
+                "sourceParam": "this",
+                "sourceKind": "method parameter",
+                "fileName": "Service.java",
+                "lineNumber": 12,
+                "path": [],
+            }
+        ]
+    )
+
+    assert len(traces) == 1
+    assert traces[0].source_param is None
+    assert traces[0].source_kind is None

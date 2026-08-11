@@ -16,6 +16,10 @@ class LLMConfig(BaseModel):
         default=5.0,
         alias="PROMPT_COST_PER_MILLION",
     )
+    cached_token_cost_per_million: Optional[float] = Field(
+        default=None,
+        alias="CACHED_TOKEN_COST_PER_MILLION",
+    )
     completion_cost_per_million: float = Field(
         default=15.0,
         alias="COMPLETION_COST_PER_MILLION",

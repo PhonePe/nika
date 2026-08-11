@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -255,23 +256,149 @@ def _enrich_trace_for_review(trace, sinks, sources):
     return trace.model_copy(update={"source": source, "sink": sink})
 
 
+def _evidence_review_key(evidence):
+    model_dump = getattr(evidence, "model_dump", None)
+    payload = model_dump(mode="json") if callable(model_dump) else evidence
+    return json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        default=str,
+    )
+
+
+def _review_evidence_with_llm(vulnerability, context, evidence_items):
+    reviews_by_evidence = {}
+    reviews = []
+
+    for evidence in evidence_items:
+        evidence_key = _evidence_review_key(evidence)
+        if evidence_key not in reviews_by_evidence:
+            reviews_by_evidence[evidence_key] = run_security_agent_review(
+                vulnerability,
+                context,
+                evidence,
+            )
+        reviews.append(reviews_by_evidence[evidence_key])
+
+    duplicate_count = len(evidence_items) - len(reviews_by_evidence)
+    if duplicate_count:
+        logging.info(
+            "Skipped LLM review for %d duplicate finding(s) in %s",
+            duplicate_count,
+            vulnerability.vulnerability_id,
+        )
+
+    return reviews
+
+
+def _source_method_review_key(trace):
+    source_symbol = getattr(trace, "source_symbol", None)
+    if not source_symbol:
+        return None
+
+    source = getattr(trace, "source", None)
+    source_metadata = getattr(source, "metadata", None) or {}
+    sink = getattr(trace, "sink", None)
+    sink_metadata = getattr(sink, "metadata", None) or {}
+    source_param = getattr(trace, "source_param", None) or sink_metadata.get(
+        "source_param"
+    )
+    if not source_param:
+        return None
+    return (
+        source_symbol,
+        _normalize_path(getattr(source, "file_path", None)),
+        getattr(source, "line_number", None),
+        source_metadata.get("class_api_path"),
+        source_metadata.get("method_api_path"),
+        source_param,
+    )
+
+
+def _review_trace_groups_with_llm(vulnerability, context, traces):
+    grouped_indexes = {}
+    groups = []
+
+    for index, trace in enumerate(traces):
+        source_key = _source_method_review_key(trace)
+        group_key = (
+            ("source_method", source_key)
+            if source_key is not None
+            else ("exact_evidence", _evidence_review_key(trace))
+        )
+        group_index = grouped_indexes.get(group_key)
+        if group_index is None:
+            grouped_indexes[group_key] = len(groups)
+            groups.append({"traces": [trace], "indexes": [index]})
+            continue
+        groups[group_index]["traces"].append(trace)
+        groups[group_index]["indexes"].append(index)
+
+    reviews = [None] * len(traces)
+    for group in groups:
+        grouped_traces = group["traces"]
+        unique_traces = list(
+            {
+                _evidence_review_key(trace): trace
+                for trace in grouped_traces
+            }.values()
+        )
+        human_prompt = None
+        if len(unique_traces) > 1:
+            human_prompt = build_grouped_trace_human_prompt(
+                vulnerability,
+                unique_traces,
+            )
+        review = run_security_agent_review(
+            vulnerability,
+            context,
+            unique_traces[0],
+            human_prompt=human_prompt,
+        )
+        for index in group["indexes"]:
+            reviews[index] = review
+
+    saved_calls = len(traces) - len(groups)
+    if saved_calls:
+        logging.info(
+            "Grouped %d trace(s) into %d LLM review(s) for %s; skipped %d redundant call(s)",
+            len(traces),
+            len(groups),
+            vulnerability.vulnerability_id,
+            saved_calls,
+        )
+
+    return reviews
+
+
 def review_traces_with_llm(vulnerability, context, state):
     state.traces = [
         _enrich_trace_for_review(trace, getattr(state, "sinks", None), getattr(state, "sources", None))
         for trace in state.traces
     ]
-    state.reviews = [
-        run_security_agent_review(vulnerability, context, trace)
-        for trace in state.traces
-    ]
+    if getattr(vulnerability, "review_grouping", None) == "source_method":
+        state.reviews = _review_trace_groups_with_llm(
+            vulnerability,
+            context,
+            state.traces,
+        )
+    else:
+        state.reviews = _review_evidence_with_llm(
+            vulnerability,
+            context,
+            state.traces,
+        )
     return state
 
 
 def review_sinks_with_llm(vulnerability, context, state):
-    state.reviews = [
-        run_security_agent_review(vulnerability, context, sink)
-        for sink in state.sinks
-    ]
+    state.reviews = _review_evidence_with_llm(
+        vulnerability,
+        context,
+        state.sinks,
+    )
     return state
 
 
@@ -287,7 +414,6 @@ def default_llm_review(vulnerability):
         "vulnerable_status": "VULNERABLE",
         "explanation": getattr(vulnerability, "fallback_explanation", None),
         "remediation": getattr(vulnerability, "fallback_remediation", None),
-        "code_fix": getattr(vulnerability, "fallback_code_fix", None),
     }
 
 
@@ -305,6 +431,11 @@ def build_trace_human_prompt(vulnerability, trace):
     source_evidence = _format_source_evidence(getattr(trace, "source", None))
     if source_evidence:
         prompt_lines.extend(["Source evidence:", source_evidence])
+    if getattr(trace, "source_param", None):
+        source_param = trace.source_param
+        if getattr(trace, "source_kind", None):
+            source_param = f"{trace.source_kind} {source_param}"
+        prompt_lines.append(f"Tainted source parameter: {source_param}")
 
     sink_evidence = _format_sink_evidence(getattr(trace, "sink", None), trace)
     if sink_evidence:
@@ -319,6 +450,98 @@ def build_trace_human_prompt(vulnerability, trace):
         prompt_lines.append(node.code)
         if node.callee_code:
             prompt_lines.append(f"Calls: {node.callee_code}")
+
+    prompt_lines.append(shared_prompt_closing_sentence())
+    return "\n".join(prompt_lines)
+
+
+def _trace_node_group_key(node):
+    return (
+        node.method_name,
+        _normalize_path(node.file_path),
+        node.method_line_number_start,
+        node.method_line_number_end,
+        node.code,
+    )
+
+
+def _shared_trace_prefix_length(traces):
+    if not traces:
+        return 0
+
+    shortest_length = min(len(trace.nodes) for trace in traces)
+    for index in range(shortest_length):
+        node_key = _trace_node_group_key(traces[0].nodes[index])
+        if any(
+            _trace_node_group_key(trace.nodes[index]) != node_key
+            for trace in traces[1:]
+        ):
+            return index
+    return shortest_length
+
+
+def _append_trace_nodes(prompt_lines, nodes, start_index=1, include_call=True):
+    for index, node in enumerate(nodes, start=start_index):
+        prompt_lines.append(
+            f"{index}. {node.file_path}:{node.method_line_number_start or '?'} {node.method_name}"
+        )
+        prompt_lines.append(node.code)
+        if include_call and node.callee_code:
+            prompt_lines.append(f"Calls: {node.callee_code}")
+
+
+def build_grouped_trace_human_prompt(vulnerability, traces):
+    opening_instruction = getattr(vulnerability, "human_prompt", None)
+    if opening_instruction is None:
+        opening_instruction = "Analyze these related vulnerability traces."
+
+    prompt_lines = [
+        opening_instruction,
+        (
+            f"Analyze these {len(traces)} traces as one source-method finding. "
+            "They share an entry source but terminate at different sinks. Return one "
+            "assessment covering the common root cause and all sink occurrences. "
+            "Return VULNERABLE if any occurrence demonstrates an unsafe shared path; "
+            "if the occurrences require incompatible conclusions, return "
+            "NEED_MANUAL_REVIEW."
+        ),
+        f"Candidate vulnerability: {getattr(vulnerability, 'vulnerability_id', 'unknown')}",
+    ]
+
+    source_evidence = _format_source_evidence(getattr(traces[0], "source", None))
+    if source_evidence:
+        prompt_lines.extend(["Shared source evidence:", source_evidence])
+    if getattr(traces[0], "source_param", None):
+        source_param = traces[0].source_param
+        if getattr(traces[0], "source_kind", None):
+            source_param = f"{traces[0].source_kind} {source_param}"
+        prompt_lines.append(f"Shared tainted source parameter: {source_param}")
+
+    prefix_length = _shared_trace_prefix_length(traces)
+    if prefix_length:
+        prompt_lines.append("Shared trace prefix:")
+        _append_trace_nodes(
+            prompt_lines,
+            traces[0].nodes[:prefix_length],
+            include_call=False,
+        )
+
+    prompt_lines.append("Sink occurrences:")
+    for occurrence_index, trace in enumerate(traces, start=1):
+        prompt_lines.append(
+            f"Occurrence {occurrence_index}: {trace.sink_file_path}:{trace.sink_line_number}"
+        )
+        sink_evidence = _format_sink_evidence(getattr(trace, "sink", None), trace)
+        if sink_evidence:
+            prompt_lines.append(sink_evidence)
+        suffix = trace.nodes[prefix_length:]
+        if suffix:
+            prompt_lines.append("Unique trace suffix:")
+            _append_trace_nodes(
+                prompt_lines,
+                suffix,
+                start_index=prefix_length + 1,
+            )
 
     prompt_lines.append(shared_prompt_closing_sentence())
     return "\n".join(prompt_lines)
@@ -481,7 +704,6 @@ def _finding_from_sink(vulnerability_id, sink, review=None, trace=None, metadata
         status=_review_status(review),
         explanation=explanation,
         remediation=review.get("remediation"),
-        code_fix=review.get("code_fix"),
         trace=trace,
         call_node_count=getattr(trace, "call_node_count", None) if trace is not None else None,
         metadata=effective_metadata,
@@ -514,6 +736,10 @@ def _trace_finding_metadata(sink, trace, source_lookup):
         metadata.update(getattr(trace_sink, "metadata", None) or {})
     if getattr(sink, "rule_id", None):
         metadata.setdefault("rule_id", sink.rule_id)
+    if getattr(trace, "source_param", None):
+        metadata["source_param"] = trace.source_param
+    if getattr(trace, "source_kind", None):
+        metadata["source_kind"] = trace.source_kind
     metadata.update(_api_path_metadata(trace, source_lookup))
     return metadata
 
@@ -602,7 +828,6 @@ def finalize_sink_findings(vulnerability, context, state):
         state.sinks,
         explanation=review.get("explanation"),
         remediation=review.get("remediation"),
-        code_fix=review.get("code_fix"),
     )
 
 
@@ -639,7 +864,6 @@ def direct_static_findings(
     line_number_end=None,
     explanation=None,
     remediation=None,
-    code_fix=None,
     metadata=None,
 ):
     findings = []
@@ -655,7 +879,6 @@ def direct_static_findings(
                 status=status,
                 explanation=_value_from_item(item, explanation),
                 remediation=_value_from_item(item, remediation),
-                code_fix=_value_from_item(item, code_fix),
                 metadata=_value_from_item(item, metadata, {}) or {},
             )
         )
@@ -670,7 +893,6 @@ def direct_findings_from_sinks(
     status: str = "VULNERABLE",
     explanation: str | None = None,
     remediation: str | None = None,
-    code_fix: str | None = None,
     metadata: dict[str, str] | None = None,
 ):
     return direct_static_findings(
@@ -683,6 +905,5 @@ def direct_findings_from_sinks(
         line_number_end=lambda sink: sink.line_number_end or sink.line_number,
         explanation=explanation,
         remediation=remediation,
-        code_fix=code_fix,
         metadata=metadata,
     )

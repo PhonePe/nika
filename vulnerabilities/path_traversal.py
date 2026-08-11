@@ -11,6 +11,8 @@ from vulnerabilities.base.stages import (
 class PathTraversalVulnerability(BaseVulnerability):
     vulnerability_id = "path_traversal"
     title = "Path Traversal"
+    review_grouping = "source_method"
+    report_grouping = "source_method"
     description = (
         "Path Traversal vulnerability allows attackers to access files and "
         "directories outside the intended scope by manipulating file paths."
@@ -47,8 +49,4 @@ class PathTraversalVulnerability(BaseVulnerability):
     fallback_remediation = (
         "Canonicalize the resolved path and verify it remains under an expected base "
         "directory before use."
-    )
-    fallback_code_fix = (
-        "Replace direct path concatenation with canonicalization plus a strict "
-        "prefix check on the resolved path."
     )
