@@ -267,7 +267,9 @@ def execute_once = {{
             if jar_path:
                 cmd.extend(["--inference-jar-paths", str(jar_path)])
 
-        command_result = execute_command(cmd, check=True)
+        cpg_opts = astrail_config.get("cpg_opts")
+        cpg_env = {"JAVA_OPTS": str(cpg_opts)} if cpg_opts else None
+        command_result = execute_command(cmd, check=True, env=cpg_env)
         logging.info("CPG generation duration: %s seconds", command_result.duration_sec)
         if not command_result.ok or not os.path.exists(output_cpg_path):
             self._cpg_file_path = ""
