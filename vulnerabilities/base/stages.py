@@ -427,11 +427,27 @@ def _normalize_path(path):
 
 def _matching_sinks_for_trace(sinks, trace):
     normalized_trace_path = _normalize_path(trace.sink_file_path)
+    trace_rule_id = getattr(trace, "sink_rule_id", None)
+    trace_sink_id = getattr(trace, "sink_id", None)
+
+    if trace_sink_id:
+        identity_matches = [
+            sink
+            for sink in sinks
+            if (getattr(sink, "metadata", None) or {}).get("sink_id") == trace_sink_id
+        ]
+        if identity_matches:
+            return identity_matches
+
+    def rule_matches(sink):
+        return not trace_rule_id or getattr(sink, "rule_id", None) == trace_rule_id
+
     exact_matches = [
         sink
         for sink in sinks
         if sink.line_number == trace.sink_line_number
         and _normalize_path(sink.file_path) == normalized_trace_path
+        and rule_matches(sink)
     ]
     if exact_matches:
         return exact_matches
@@ -443,6 +459,7 @@ def _matching_sinks_for_trace(sinks, trace):
         sink
         for sink in sinks
         if sink.line_number == trace.sink_line_number
+        and rule_matches(sink)
         and (
             normalized_trace_path.endswith(_normalize_path(sink.file_path))
             or _normalize_path(sink.file_path).endswith(normalized_trace_path)
@@ -521,24 +538,51 @@ def _trace_finding_metadata(sink, trace, source_lookup):
 def findings_from_trace_review(vulnerability_id: str, sinks, traces, reviews, source_lookup=None):
     sink_lookup = {}
     normalized_sink_lookup = {}
+    sink_id_lookup = {}
 
     for sink in sinks:
-        sink_key = (sink.file_path, sink.line_number)
+        sink_id = (getattr(sink, "metadata", None) or {}).get("sink_id")
+        if sink_id:
+            sink_id_lookup.setdefault(sink_id, []).append(sink)
+        sink_key = (sink.file_path, sink.line_number, sink.rule_id)
         sink_lookup.setdefault(sink_key, []).append(sink)
 
-        normalized_key = (_normalize_path(sink.file_path), sink.line_number)
+        normalized_key = (_normalize_path(sink.file_path), sink.line_number, sink.rule_id)
         normalized_sink_lookup.setdefault(normalized_key, []).append(sink)
 
     findings = []
 
     for index, trace in enumerate(traces):
         review = reviews[index] if index < len(reviews) else {}
-        direct_matches = sink_lookup.get((trace.sink_file_path, trace.sink_line_number), [])
+        direct_matches = sink_id_lookup.get(getattr(trace, "sink_id", None), [])
+        if not direct_matches:
+            direct_matches = sink_lookup.get(
+                (trace.sink_file_path, trace.sink_line_number, trace.sink_rule_id), []
+            )
+        if not direct_matches and not trace.sink_rule_id:
+            direct_matches = [
+                sink
+                for (path, line, _rule), candidates in sink_lookup.items()
+                if path == trace.sink_file_path and line == trace.sink_line_number
+                for sink in candidates
+            ]
         sink = direct_matches[0] if len(direct_matches) == 1 else None
         if sink is None:
             normalized_matches = normalized_sink_lookup.get(
-                (_normalize_path(trace.sink_file_path), trace.sink_line_number)
+                (
+                    _normalize_path(trace.sink_file_path),
+                    trace.sink_line_number,
+                    trace.sink_rule_id,
+                )
             ) or []
+            if not normalized_matches and not trace.sink_rule_id:
+                normalized_matches = [
+                    sink
+                    for (path, line, _rule), candidates in normalized_sink_lookup.items()
+                    if path == _normalize_path(trace.sink_file_path)
+                    and line == trace.sink_line_number
+                    for sink in candidates
+                ]
             if len(normalized_matches) == 1:
                 sink = normalized_matches[0]
         if sink is None:

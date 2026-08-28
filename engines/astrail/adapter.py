@@ -60,8 +60,13 @@ class AstrailEngine:
 
         pairs = (
             (
-                SimpleNamespace(methodName=source.symbol),
-                {"lineNumber": sink.line_number, "file": sink.file_path},
+                SimpleNamespace(
+                    methodName=source.symbol,
+                    taintParameterIndexes=(source.metadata or {}).get(
+                        "taint_parameter_indexes", []
+                    ),
+                ),
+                self._sink_query_target(sink),
             )
             for sink in sinks
             for source in sources
@@ -88,6 +93,19 @@ class AstrailEngine:
             )
 
         return translate_batch_reachability(batch_result)
+
+    @staticmethod
+    def _sink_query_target(sink):
+        metadata = getattr(sink, "metadata", None) or {}
+        return {
+            "lineNumber": sink.line_number,
+            "file": sink.file_path,
+            "ruleId": sink.rule_id or metadata.get("rule_id") or "",
+            "sinkId": metadata.get("sink_id") or "",
+            "matchStart": metadata.get("match_start") or {},
+            "matchEnd": metadata.get("match_end") or {},
+            "operand": metadata.get("sink_operand") or {},
+        }
 
     def resolve_constant_args(self, context, locations):
         raw = self._get_query_runner().run_const_arg_resolution(locations)

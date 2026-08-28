@@ -175,6 +175,112 @@ def findPathsBatch(
         .toSet
     val excludeTypeSet = excludeArgTypes.filter(_.nonEmpty).toSet
 
+    case class PairSpec(
+        sourceFullName: String,
+        lineNumber: Int,
+        fileName: String,
+        matchStartLine: Option[Int],
+        matchStartCol: Option[Int],
+        matchEndLine: Option[Int],
+        matchEndCol: Option[Int],
+        operandCode: String,
+        operandStartLine: Option[Int],
+        operandStartCol: Option[Int],
+        operandEndLine: Option[Int],
+        operandEndCol: Option[Int],
+        ruleId: String,
+        sourceParameterIndexes: Set[Int],
+        sinkId: String
+    )
+
+    def optionalInt(value: String): Option[Int] =
+        if (value == null || value.trim.isEmpty) None
+        else scala.util.Try(value.trim.toInt).toOption
+
+    def decodeField(value: String): String = {
+        if (value == null || value.isEmpty) ""
+        else new String(java.util.Base64.getDecoder.decode(value), "UTF-8")
+    }
+
+    def parsePair(line: String): Option[PairSpec] = {
+        val parts = line.split("\\t", -1)
+        if (parts.length < 3) None
+        else {
+            optionalInt(parts(1)).map { sinkLine =>
+                PairSpec(
+                    parts(0),
+                    sinkLine,
+                    parts(2),
+                    if (parts.length > 3) optionalInt(parts(3)) else None,
+                    if (parts.length > 4) optionalInt(parts(4)) else None,
+                    if (parts.length > 5) optionalInt(parts(5)) else None,
+                    if (parts.length > 6) optionalInt(parts(6)) else None,
+                    if (parts.length > 7) decodeField(parts(7)) else "",
+                    if (parts.length > 8) optionalInt(parts(8)) else None,
+                    if (parts.length > 9) optionalInt(parts(9)) else None,
+                    if (parts.length > 10) optionalInt(parts(10)) else None,
+                    if (parts.length > 11) optionalInt(parts(11)) else None,
+                    if (parts.length > 12) decodeField(parts(12)) else "",
+                    if (parts.length > 13) parts(13).split(",").flatMap(optionalInt).toSet else Set.empty,
+                    if (parts.length > 14) decodeField(parts(14)) else ""
+                )
+            }
+        }
+    }
+
+    def normalizePath(value: String): String =
+        Option(value).getOrElse("").replace('\\', '/').stripPrefix("./")
+
+    def sameFile(actual: String, expected: String): Boolean = {
+        val normalizedActual = normalizePath(actual)
+        val normalizedExpected = normalizePath(expected)
+        normalizedActual == normalizedExpected ||
+            normalizedActual.endsWith("/" + normalizedExpected)
+    }
+
+    def overlaps(
+        nodeStartLine: Option[Int], nodeStartCol: Option[Int],
+        nodeEndLine: Option[Int], nodeEndCol: Option[Int],
+        rangeStartLine: Option[Int], rangeStartCol: Option[Int],
+        rangeEndLine: Option[Int], rangeEndCol: Option[Int]
+    ): Boolean = {
+        if (rangeStartLine.isEmpty) true
+        else if (nodeStartLine.isEmpty) false
+        else {
+            val nsLine = nodeStartLine.get
+            val neLine = nodeEndLine.getOrElse(nsLine)
+            val rsLine = rangeStartLine.get
+            val reLine = rangeEndLine.getOrElse(rsLine)
+            val lineOverlap = nsLine <= reLine && neLine >= rsLine
+            if (!lineOverlap) false
+            else if (nsLine == neLine && rsLine == reLine) {
+                val nsCol = nodeStartCol.getOrElse(0)
+                val neCol = nodeEndCol.getOrElse(Int.MaxValue)
+                val rsCol = rangeStartCol.getOrElse(0)
+                val reCol = rangeEndCol.getOrElse(Int.MaxValue)
+                nsCol <= reCol && neCol >= rsCol
+            } else true
+        }
+    }
+
+    def inferredEndPosition(
+        startLine: Option[Int],
+        startCol: Option[Int],
+        code: String
+    ): (Option[Int], Option[Int]) = {
+        if (startLine.isEmpty) (None, None)
+        else {
+            val lines = Option(code).getOrElse("").split("\\r?\\n", -1)
+            val endLine = Some(startLine.get + lines.length - 1)
+            val endCol = if (lines.length == 1) {
+                startCol.map(_ + lines.head.length)
+            } else {
+                Some(lines.last.length + 1)
+            }
+            (endLine, endCol)
+        }
+    }
+
     def isExcludedParam(p: io.shiftleft.codepropertygraph.generated.nodes.MethodParameterIn): Boolean = {
         val annoExcluded =
             excludeAnnoSet.nonEmpty && p.annotation.name.exists(excludeAnnoSet.contains)
@@ -186,11 +292,13 @@ def findPathsBatch(
     }
 
     val taintParamCache = mutable.Map[Long, List[io.shiftleft.codepropertygraph.generated.nodes.MethodParameterIn]]()
-    def taintParams(source: Method): List[io.shiftleft.codepropertygraph.generated.nodes.MethodParameterIn] = {
-        taintParamCache.getOrElseUpdate(source.id, {
+    def taintParams(source: Method, selectedIndexes: Set[Int]): List[io.shiftleft.codepropertygraph.generated.nodes.MethodParameterIn] = {
+        val eligible = taintParamCache.getOrElseUpdate(source.id, {
             if (excludeAnnoSet.isEmpty && excludeTypeSet.isEmpty) source.parameter.l
             else source.parameter.filterNot(isExcludedParam).l
         })
+        if (selectedIndexes.nonEmpty) eligible.filter(p => selectedIndexes.contains(p.index))
+        else eligible
     }
 
     // ── Caches ──
@@ -229,12 +337,10 @@ def findPathsBatch(
     var skippedNoData = 0
 
     for (line <- lines) {
-        val parts = line.split("\t")
-        if (parts.length >= 3) {
-            val sourceFullName = parts(0)
-            val lineNumber = parts(1).toInt
-            val fileName = parts(2)
-            val regexFileName = s".*$fileName"
+        parsePair(line).foreach { pair =>
+            val sourceFullName = pair.sourceFullName
+            val lineNumber = pair.lineNumber
+            val fileName = pair.fileName
 
             processed += 1
             if (processed % 100 == 0) {
@@ -252,9 +358,20 @@ def findPathsBatch(
                     val source = sourceOpt.get
 
                     // Lookup sink call candidates (cached by file+line)
-                    val callNodeCandidates = sinkCallCache.getOrElseUpdate((fileName, lineNumber),
-                        cpg.file.name(regexFileName).method.call.filter(_.lineNumber.exists(_ == lineNumber)).l
+                    val callsOnSinkLine = sinkCallCache.getOrElseUpdate((fileName, lineNumber),
+                        cpg.file.filter(f => sameFile(f.name, fileName)).method.call
+                            .filter(c => c.lineNumber.exists(_ == lineNumber)).l
                     )
+                    val callNodeCandidates = callsOnSinkLine.filter { c =>
+                        val (endLine, endCol) = inferredEndPosition(
+                            c.lineNumber, c.columnNumber, c.code
+                        )
+                        overlaps(
+                            c.lineNumber, c.columnNumber, endLine, endCol,
+                            pair.matchStartLine.orElse(Some(lineNumber)), pair.matchStartCol,
+                            pair.matchEndLine, pair.matchEndCol
+                        )
+                    }
 
                     if (callNodeCandidates.isEmpty) {
                         skippedNoData += 1
@@ -275,13 +392,32 @@ def findPathsBatch(
                             skippedBfs += 1
                         } else {
                             // Data flow check only on BFS-confirmed candidates
-                            val sourceTaintParams = taintParams(source)
+                            val sourceTaintParams = taintParams(source, pair.sourceParameterIndexes)
                             for (cand <- reachableCandidates if sinkFullName.isEmpty) {
                                 try {
-                                    val sinkArgCand = cand.argument
+                                    val arguments = cand.argument.l
+                                    val positionMatchedArguments =
+                                        if (pair.operandStartLine.isEmpty) Nil
+                                        else arguments.filter { arg =>
+                                            val (endLine, endCol) = inferredEndPosition(
+                                                arg.lineNumber, arg.columnNumber, arg.code
+                                            )
+                                            overlaps(
+                                                arg.lineNumber, arg.columnNumber, endLine, endCol,
+                                                pair.operandStartLine, pair.operandStartCol,
+                                                pair.operandEndLine, pair.operandEndCol
+                                            )
+                                        }
+                                    val codeMatchedArguments =
+                                        if (pair.operandCode.trim.isEmpty) Nil
+                                        else arguments.filter(_.code.trim == pair.operandCode.trim)
+                                    val sinkArgCand =
+                                        if (positionMatchedArguments.nonEmpty) positionMatchedArguments
+                                        else if (codeMatchedArguments.nonEmpty) codeMatchedArguments
+                                        else arguments
                                     val flows =
                                         if (sourceTaintParams.isEmpty) List.empty
-                                        else sinkArgCand.reachableByFlows(sourceTaintParams).l
+                                        else sinkArgCand.iterator.reachableByFlows(sourceTaintParams).l
                                     // Sanitized when every flow passes a sanitizer; report only
                                     // if at least one clean (unsanitized) path reaches the sink.
                                     val cleanFlows =
@@ -363,7 +499,7 @@ def findPathsBatch(
 
                                     if (results.nonEmpty) {
                                         val pathJson = results.mkString("[", ",", "]")
-                                        val entryJson = s"""{"source":"${esc(sourceFullName)}","lineNumber":$lineNumber,"fileName":"${esc(fileName)}","callNodeCount":$sinkCallNodeCount,"path":$pathJson}"""
+                                        val entryJson = s"""{"source":"${esc(sourceFullName)}","lineNumber":$lineNumber,"fileName":"${esc(fileName)}","ruleId":"${esc(pair.ruleId)}","sinkId":"${esc(pair.sinkId)}","callNodeCount":$sinkCallNodeCount,"path":$pathJson}"""
                                         allResults.append(entryJson)
                                     }
                                 }
