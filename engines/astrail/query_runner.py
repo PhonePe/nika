@@ -1,8 +1,10 @@
+import base64
+import itertools
 import json
 import logging
 import os
 import tempfile
-import itertools
+
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -29,6 +31,15 @@ def _scala_literal(value: str) -> str:
     return f'"{escaped}"'
 
 
+def _base64_encode(value) -> str:
+    text = "" if value is None else str(value)
+    return base64.b64encode(text.encode("utf-8")).decode("ascii")
+
+
+def _position_value(position: dict | None, key: str):
+    return (position or {}).get(key, "")
+
+
 class AstrailQueryRunner:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
@@ -44,7 +55,6 @@ class AstrailQueryRunner:
 
     @staticmethod
     def _write_params_file(params: dict) -> str:
-        import base64
         fd, path = tempfile.mkstemp(suffix=".params")
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             first = True
@@ -60,7 +70,7 @@ class AstrailQueryRunner:
                 for item in values:
                     if item is None:
                         continue
-                    encoded = base64.b64encode(str(item).encode("utf-8")).decode("ascii")
+                    encoded = _base64_encode(item)
                     handle.write(("" if first else "\n") + f"{key}\t{encoded}")
                     first = False
         return path
@@ -267,7 +277,9 @@ def execute_once = {{
             if jar_path:
                 cmd.extend(["--inference-jar-paths", str(jar_path)])
 
-        command_result = execute_command(cmd, check=True)
+        cpg_opts = astrail_config.get("cpg_opts")
+        cpg_env = {"JAVA_OPTS": str(cpg_opts)} if cpg_opts else None
+        command_result = execute_command(cmd, check=True, env=cpg_env)
         logging.info("CPG generation duration: %s seconds", command_result.duration_sec)
         if not command_result.ok or not os.path.exists(output_cpg_path):
             self._cpg_file_path = ""
@@ -324,6 +336,37 @@ def execute_once = {{
 
     @staticmethod
     def _encode_pairs(pairs):
+        for source, sink in pairs:
+            match_start = sink.get("matchStart") or {}
+            match_end = sink.get("matchEnd") or {}
+            operand = sink.get("operand") or {}
+            operand_start = operand.get("start") or {}
+            operand_end = operand.get("end") or {}
+            source_indexes = ",".join(
+                str(index)
+                for index in (getattr(source, "taintParameterIndexes", None) or [])
+            )
+            fields = [
+                source.methodName,
+                sink.get("lineNumber", ""),
+                sink.get("file", ""),
+                _position_value(match_start, "line"),
+                _position_value(match_start, "col"),
+                _position_value(match_end, "line"),
+                _position_value(match_end, "col"),
+                _base64_encode(operand.get("code", "")),
+                _position_value(operand_start, "line"),
+                _position_value(operand_start, "col"),
+                _position_value(operand_end, "line"),
+                _position_value(operand_end, "col"),
+                _base64_encode(sink.get("ruleId", "")),
+                source_indexes,
+                _base64_encode(sink.get("sinkId", "")),
+            ]
+            yield "\t".join(str(field) for field in fields)
+
+    @staticmethod
+    def _encode_legacy_pairs(pairs):
         for source, sink in pairs:
             yield f"{source.methodName}\t{sink.get('lineNumber', '')}\t{sink.get('file', '')}"
 
@@ -396,13 +439,19 @@ def execute_once = {{
                 raise AstrailEngineError(
                     f"Batch reachability query failed: {result.get('error', 'unknown')}"
                 )
+            query_output = (result.get("stdout") or "").strip()
+            if query_output:
+                logging.debug("Astrail batch query output:\n%s", query_output)
 
             if output_tmp and os.path.exists(output_tmp):
                 with open(output_tmp, "r", encoding="utf-8") as handle:
                     data = handle.read()
                 if data:
                     return json.loads(data)
-            return []
+            raise AstrailEngineError(
+                "Batch reachability query produced no output. "
+                "Check the Astrail batch query output for compilation/runtime errors."
+            )
         except AstrailEngineError:
             raise
         except Exception as exc:
@@ -416,7 +465,7 @@ def execute_once = {{
                         pass
 
     def run_aggressive_reachability(self, pairs, sanitizers=None):
-        params_tmp = self._write_params_file({"pair": self._encode_pairs(pairs)})
+        params_tmp = self._write_params_file({"pair": self._encode_legacy_pairs(pairs)})
         if os.path.getsize(params_tmp) == 0:
             os.remove(params_tmp)
             return []
@@ -689,7 +738,7 @@ def execute_once = {{
         sink_names=None,
         receiver_only_sinks=None,
     ):
-        pair_values = list(self._encode_pairs(pairs))
+        pair_values = list(self._encode_legacy_pairs(pairs))
         if not pair_values:
             return []
 
@@ -756,7 +805,7 @@ def execute_once = {{
         source_annotations=None,
         request_accessors=None,
     ):
-        pair_values = list(self._encode_pairs(pairs))
+        pair_values = list(self._encode_legacy_pairs(pairs))
         if not pair_values:
             return []
 
