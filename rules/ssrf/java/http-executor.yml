@@ -10,6 +10,7 @@ rules:
     pattern-sources:
       - pattern: HttpPostExecutor.builder()
       - pattern: HttpGetExecutor.builder()
+      - pattern: HttpExecutorRequest.builder()
 
     pattern-sinks:
       - pattern: $RT.url($PARAM)
