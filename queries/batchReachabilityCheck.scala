@@ -1,5 +1,5 @@
 import scala.collection.mutable
-import io.shiftleft.codepropertygraph.generated.nodes.Method
+import io.shiftleft.codepropertygraph.generated.nodes.{Call, Expression, Method}
 import java.util.regex.Pattern
 
 def loadParams(path: String): Map[String, Seq[String]] = {
@@ -168,6 +168,25 @@ def findPathsBatch(
     val sanitizerSet = sanitizers.toSet
     def isSanitizerCall(c: Call): Boolean =
         sanitizerSet.contains(c.name) || sanitizers.exists(s => c.methodFullName.contains(s))
+
+    def hasDominatingSanitizer(
+        sinkCall: Call,
+        sinkArguments: Iterable[Expression],
+        operandCode: String
+    ): Boolean = {
+        val sinkArgumentCodes = sinkArguments.iterator
+            .map(_.code.trim)
+            .filter(_.nonEmpty)
+            .toSet ++ Option(operandCode).map(_.trim).filter(_.nonEmpty)
+        sanitizers.nonEmpty && sinkArgumentCodes.nonEmpty &&
+            sinkCall.dominatedBy.l.collect {
+                case call: Call if isSanitizerCall(call) => call
+            }.exists { sanitizer =>
+                sanitizer.argument.l.exists { argument =>
+                    sinkArgumentCodes.contains(argument.code.trim)
+                }
+            }
+    }
 
     val excludeAnnoSet = excludeArgAnnotations
         .map(a => if (a.startsWith("@")) a.substring(1) else a)
@@ -420,12 +439,19 @@ def findPathsBatch(
                                         else sinkArgCand.iterator.reachableByFlows(sourceTaintParams).l
                                     // Sanitized when every flow passes a sanitizer; report only
                                     // if at least one clean (unsanitized) path reaches the sink.
+                                    val guardedBySanitizer =
+                                        hasDominatingSanitizer(
+                                            cand, sinkArgCand, pair.operandCode
+                                        )
                                     val cleanFlows =
                                         if (sanitizers.isEmpty) flows
-                                        else flows.filter(p => !p.elements.exists {
-                                            case c: Call => isSanitizerCall(c)
-                                            case _ => false
-                                        })
+                                        else if (guardedBySanitizer) List.empty
+                                        else flows.filter { path =>
+                                            !path.elements.exists {
+                                                case call: Call => isSanitizerCall(call)
+                                                case _ => false
+                                            }
+                                        }
                                     if (cleanFlows.nonEmpty) {
                                         // Count the call nodes on the shortest data-flow path between the source and the sink.
                                         val bestFlow = cleanFlows.minBy(_.elements.size)
