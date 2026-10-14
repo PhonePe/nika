@@ -102,6 +102,19 @@ def test_batch_query_uses_exact_file_and_operand_selection():
     assert "arg.lineNumberEnd" not in query
 
 
+def test_batch_query_recognizes_dominating_same_operand_sanitizers():
+    query_path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "queries", "batchReachabilityCheck.scala"
+    )
+    with open(query_path, encoding="utf-8") as handle:
+        query = handle.read()
+
+    assert "def hasDominatingSanitizer" in query
+    assert "sinkCall.dominatedBy.l" in query
+    assert "sinkArgumentCodes.contains(argument.code.trim)" in query
+    assert "cand, sinkArgCand, pair.operandCode" in query
+
+
 def test_source_query_limits_servlet_taint_to_request_carriers():
     query_path = os.path.join(
         os.path.dirname(__file__), "..", "..", "queries", "getApiPath.scala"
