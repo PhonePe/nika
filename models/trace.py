@@ -18,6 +18,8 @@ class TraceNode(BaseModel):
 class Trace(BaseModel):
     sink_file_path: str
     sink_line_number: int
+    sink_rule_id: str | None = None
+    sink_id: str | None = None
     nodes: list[TraceNode] = Field(default_factory=list)
     source_symbol: str | None = None
     source: Source | None = None

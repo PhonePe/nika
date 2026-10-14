@@ -60,8 +60,13 @@ class AstrailEngine:
 
         pairs = (
             (
-                SimpleNamespace(methodName=source.symbol),
-                {"lineNumber": sink.line_number, "file": sink.file_path},
+                SimpleNamespace(
+                    methodName=source.symbol,
+                    taintParameterIndexes=(source.metadata or {}).get(
+                        "taint_parameter_indexes", []
+                    ),
+                ),
+                self._sink_query_target(sink),
             )
             for sink in sinks
             for source in sources
@@ -88,6 +93,19 @@ class AstrailEngine:
             )
 
         return translate_batch_reachability(batch_result)
+
+    @staticmethod
+    def _sink_query_target(sink):
+        metadata = getattr(sink, "metadata", None) or {}
+        return {
+            "lineNumber": sink.line_number,
+            "file": sink.file_path,
+            "ruleId": sink.rule_id or metadata.get("rule_id") or "",
+            "sinkId": metadata.get("sink_id") or "",
+            "matchStart": metadata.get("match_start") or {},
+            "matchEnd": metadata.get("match_end") or {},
+            "operand": metadata.get("sink_operand") or {},
+        }
 
     def resolve_constant_args(self, context, locations):
         raw = self._get_query_runner().run_const_arg_resolution(locations)
@@ -203,6 +221,42 @@ class AstrailEngine:
             pairs,
             source_annotations=source_annotations,
             request_accessors=request_accessors,
+        )
+        results = {}
+        for entry in raw or []:
+            key = (
+                entry.get("source"),
+                entry.get("fileName"),
+                int(entry.get("lineNumber") or 0),
+            )
+            results[key] = entry
+        return results
+
+    def find_tainted_variable_flows(
+        self,
+        context,
+        traces,
+        source_annotations=None,
+        request_accessors=None,
+        sink_names=None,
+        receiver_only_sinks=None,
+    ):
+        pairs = (
+            (
+                SimpleNamespace(methodName=trace.source_symbol),
+                {"lineNumber": trace.sink_line_number, "file": trace.sink_file_path},
+            )
+            for trace in (traces or [])
+            if getattr(trace, "source_symbol", None)
+            and getattr(trace, "sink_line_number", None)
+            and getattr(trace, "sink_file_path", None)
+        )
+        raw = self._get_query_runner().run_tainted_variable_flow_analysis(
+            pairs,
+            source_annotations=source_annotations,
+            request_accessors=request_accessors,
+            sink_names=sink_names,
+            receiver_only_sinks=receiver_only_sinks,
         )
         results = {}
         for entry in raw or []:

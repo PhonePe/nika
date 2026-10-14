@@ -156,9 +156,9 @@ class HtmlReportRenderer:
     def _trace_code_block(self, v: Vulnerability) -> str:
         flow_segments = []
         rendered_locations = set()
-        evidence = self._evidence_summary(v)
-        if evidence:
-            flow_segments.append(evidence)
+        # evidence = self._evidence_summary(v)
+        # if evidence:
+        #     flow_segments.append(evidence)
 
         if v.call_graph and len(v.call_graph) > 0:
             for i, node in enumerate(v.call_graph):

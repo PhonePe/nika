@@ -110,6 +110,8 @@ tools:
   astrail:
     astrailpath: '/opt/astrail/astrail'
     javasrc2cpg: '/opt/astrail/javasrc2cpg'
+    # JVM options used only while generating the CPG with javasrc2cpg.
+    # cpg_opts: '-Xms2g -Xmx16g -XX:+UseG1GC -XX:+UseStringDeduplication'
     port: 9004
 
   opengrep:

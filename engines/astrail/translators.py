@@ -24,6 +24,10 @@ def translate_sources(raw: list[dict]) -> list[Source]:
                 metadata={
                     "class_api_path": entry.get("classAPIPath") or "",
                     "method_api_path": entry.get("methodAPIPath") or "",
+                    "taint_parameter_indexes": [
+                        int(index)
+                        for index in (entry.get("taintParameterIndexes") or [])
+                    ],
                 },
             )
         )
@@ -70,6 +74,8 @@ def translate_batch_reachability(raw: list[dict]) -> list[Trace]:
             Trace(
                 sink_file_path=entry.get("fileName", ""),
                 sink_line_number=int(entry.get("lineNumber") or 0),
+                sink_rule_id=entry.get("ruleId") or None,
+                sink_id=entry.get("sinkId") or None,
                 nodes=nodes,
                 source_symbol=_extract_source_symbol(entry),
                 call_node_count=_normalize_optional_int(entry.get("callNodeCount")),

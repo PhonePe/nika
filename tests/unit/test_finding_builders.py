@@ -11,6 +11,7 @@ from vulnerabilities.base.stages import (
     default_llm_review,
     direct_findings_from_sinks,
     findings_from_sink_review,
+    findings_from_trace_review,
 )
 
 
@@ -128,3 +129,41 @@ def test_trace_prompt_includes_explicit_source_sink_and_metavars():
     assert "Rule ID: rules.sql_injection.java.jdbc-statement-exec-sink" in prompt
     assert "Request controlled: False" in prompt
     assert "$SQL: request (propagated from new HttpGet(url))" in prompt
+
+
+def test_trace_rule_identity_disambiguates_sinks_on_same_line():
+    sinks = [
+        _sink(rule_id="rule-a", code="first()"),
+        _sink(rule_id="rule-b", code="second()"),
+    ]
+    trace = Trace(
+        sink_file_path="A.java",
+        sink_line_number=10,
+        sink_rule_id="rule-b",
+        nodes=[],
+    )
+
+    findings = findings_from_trace_review("sql_injection", sinks, [trace], [{}])
+
+    assert len(findings) == 1
+    assert findings[0].sink == "second()"
+    assert findings[0].metadata["rule_id"] == "rule-b"
+
+
+def test_trace_sink_identity_disambiguates_same_rule_on_same_line():
+    sinks = [
+        _sink(rule_id="rule-a", code="first()", metadata={"sink_id": "first"}),
+        _sink(rule_id="rule-a", code="second()", metadata={"sink_id": "second"}),
+    ]
+    trace = Trace(
+        sink_file_path="A.java",
+        sink_line_number=10,
+        sink_rule_id="rule-a",
+        sink_id="second",
+        nodes=[],
+    )
+
+    findings = findings_from_trace_review("sql_injection", sinks, [trace], [{}])
+
+    assert len(findings) == 1
+    assert findings[0].sink == "second()"

@@ -1,6 +1,10 @@
 import json
 
-from engines.astrail.translators import _normalize_optional_int, translate_sources
+from engines.astrail.translators import (
+    _normalize_optional_int,
+    translate_batch_reachability,
+    translate_sources,
+)
 from engines.opengrep.translators import translate_opengrep_results
 
 
@@ -16,14 +20,16 @@ def test_translate_opengrep_relativizes_path_and_maps_fields():
     raw = {"results": [{
         "check_id": "rules.sqli.java-hibernate",
         "path": "/repo/src/A.java",
-        "start": {"line": 12},
-        "end": {"line": 14},
+        "start": {"line": 12, "col": 9, "offset": 100},
+        "end": {"line": 14, "col": 4, "offset": 150},
         "extra": {
             "lines": "  em.createQuery(sql)  ",
             "metadata": {"confidence": "HIGH", "sink_kind": "sql"},
             "metavars": {
                 "$SQL": {
                     "abstract_content": "sql",
+                    "start": {"line": 12, "col": 24, "offset": 115},
+                    "end": {"line": 12, "col": 27, "offset": 118},
                     "propagated_value": {"svalue_abstract_content": "name + suffix"},
                 }
             },
@@ -41,6 +47,13 @@ def test_translate_opengrep_relativizes_path_and_maps_fields():
     assert s.metadata["sink_kind"] == "sql"
     assert s.metadata["metavars"]["$SQL"]["abstract_content"] == "sql"
     assert s.metadata["metavars"]["$SQL"]["propagated_value"] == "name + suffix"
+    assert s.metadata["match_start"] == {"line": 12, "col": 9, "offset": 100}
+    assert s.metadata["sink_operand"] == {
+        "metavariable": "$SQL",
+        "code": "sql",
+        "start": {"line": 12, "col": 24, "offset": 115},
+        "end": {"line": 12, "col": 27, "offset": 118},
+    }
 
 
 def test_translate_opengrep_accepts_string_payload_and_empty_results():
@@ -57,9 +70,42 @@ def test_translate_sources_maps_api_path_metadata():
     raw = [{
         "methodName": "com.x.C.f:void()", "fileName": "C.java", "lineNumber": 3,
         "code": "public void f()", "classAPIPath": "/api", "methodAPIPath": "/x",
+        "taintParameterIndexes": [1, 3],
     }]
     sources = translate_sources(raw)
     assert len(sources) == 1
     s = sources[0]
     assert s.symbol == "com.x.C.f:void()" and s.file_path == "C.java" and s.line_number == 3
     assert s.metadata["class_api_path"] == "/api" and s.metadata["method_api_path"] == "/x"
+    assert s.metadata["taint_parameter_indexes"] == [1, 3]
+
+
+def test_translate_opengrep_preserves_distinct_rules_on_same_line():
+    result = {
+        "path": "src/A.java",
+        "start": {"line": 8, "col": 5},
+        "end": {"line": 8, "col": 20},
+        "extra": {"lines": "a(); b();"},
+    }
+    raw = {"results": [
+        {**result, "check_id": "rule-a"},
+        {**result, "check_id": "rule-b"},
+    ]}
+
+    sinks = translate_opengrep_results(raw, "/repo")
+
+    assert [sink.rule_id for sink in sinks] == ["rule-a", "rule-b"]
+
+
+def test_translate_trace_carries_sink_rule_identity():
+    traces = translate_batch_reachability([{
+        "source": "C.endpoint:void(java.lang.String)",
+        "fileName": "src/C.java",
+        "lineNumber": 9,
+        "ruleId": "rules.sql.exact-sink",
+        "sinkId": "rules.sql.exact-sink|src/C.java|9|1|9|20",
+        "path": [],
+    }])
+
+    assert traces[0].sink_rule_id == "rules.sql.exact-sink"
+    assert traces[0].sink_id == "rules.sql.exact-sink|src/C.java|9|1|9|20"
